@@ -82,7 +82,7 @@ own verb rather than a flag on `screenshot`.
   find out. Match that; do not strip it.
 - Four-space indent, Java 25, no wildcard imports.
 - Conventional commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`.
-- Files stay small. The whole mod is five classes and should stay legible in one sitting.
+- Files stay small. The whole mod is seven short classes and should stay legible in one sitting.
 
 ## Pull requests
 

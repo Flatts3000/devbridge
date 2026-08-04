@@ -39,6 +39,10 @@ final class Handlers {
                 request.has("name") ? request.get("name").getAsString() : null);
             case "hud" -> ClientHandlers.hud(server,
                 !request.has("show") || request.get("show").getAsBoolean());
+            case "input" -> ClientHandlers.input(server,
+                !request.has("enabled") || request.get("enabled").getAsBoolean());
+            case "pause" -> ClientHandlers.pause(server,
+                !request.has("enabled") || request.get("enabled").getAsBoolean());
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a
             // tool whose entire job is reporting what happened.
@@ -64,6 +68,9 @@ final class Handlers {
         reply.addProperty("side", server.isDedicatedServer() ? "dedicated" : "integrated");
         reply.addProperty("mcVersion", SharedConstants.getCurrentVersion().name());
         reply.addProperty("hasClient", ClientHandlers.available(server));
+        // Whether this client will answer while you are looking at something else, and whether the
+        // mouse is yours. Both are worth knowing before a caller waits on a reply that will not come.
+        ClientHandlers.describe(reply, server);
         return reply;
     }
 

@@ -38,6 +38,14 @@ public class DevBridge {
     /** The system property that turns the whole thing on, and the port it listens on. */
     public static final String PORT_PROPERTY = "devbridge.port";
 
+    /**
+     * Keep the world ticking while the window is in the background. On unless set to {@code false}.
+     */
+    public static final String KEEP_TICKING_PROPERTY = "devbridge.keepTicking";
+
+    /** Take the mouse on world load, so a stray hand cannot turn the camera. On unless {@code false}. */
+    public static final String LOCK_INPUT_PROPERTY = "devbridge.lockInput";
+
     private static BridgeServer server;
 
     public DevBridge(IEventBus modBus) {
@@ -62,7 +70,41 @@ public class DevBridge {
         }
     }
 
+    /**
+     * A behaviour switch, on unless explicitly turned off.
+     *
+     * <p>These default to on because they are what makes a client answer at all from outside the
+     * window, so the common case should need no arguments. Unlike {@link #PORT_PROPERTY} they are
+     * ergonomics rather than the security boundary, which is why they are options and the bind
+     * address is not.
+     *
+     * <p>Only {@code false} turns one off. Anything else is a typo that leaves the default in place
+     * and says so, because silently disabling a default on a misspelling is how somebody spends an
+     * afternoon wondering why their screenshots are of the pause menu.
+     */
+    private static boolean flag(String property) {
+        String value = System.getProperty(property);
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String trimmed = value.trim();
+        if ("false".equalsIgnoreCase(trimmed)) {
+            return false;
+        }
+        if (!"true".equalsIgnoreCase(trimmed)) {
+            LOGGER.warn("{} is not true or false: '{}'. Leaving it on.", property, value);
+        }
+        return true;
+    }
+
     private void onServerStarted(ServerStartedEvent event) {
+        // Before the socket check, so it is reasserted on every world load rather than only the
+        // first. Both settings are per-instance and free to set again, and a caller who pressed
+        // F3+P or unlocked the mouse in between should not have to work out why the tool went quiet
+        // on the next world.
+        ClientHandlers.prepareForRemoteControl(
+            event.getServer(), flag(KEEP_TICKING_PROPERTY), flag(LOCK_INPUT_PROPERTY));
+
         if (server != null) {
             return;   // singleplayer opens and closes worlds repeatedly; keep the first socket
         }

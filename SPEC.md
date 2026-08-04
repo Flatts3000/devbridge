@@ -29,6 +29,9 @@ screenshots in the loop, "change a number, rebuild, reshoot, look" is one comman
 | Binding | **127.0.0.1 only, never 0.0.0.0** | This executes arbitrary commands. See the security note, which is not a formality |
 | Auth | **None, and that is why binding matters** | A token on a loopback-only socket protects against nothing that loopback does not already exclude, and would be one more thing to keep in sync |
 | Client vs server verbs | **Both, in one mod** | Commands need the server thread, screenshots need the client render thread. In singleplayer both live in one process, which is exactly the case RCON cannot serve |
+| Focus pause | **Turned off on world load. `devbridge.keepTicking=false` opts out** | The pause screen stops the integrated server ticking, so an unfocused client answers nothing. Every use of this mod is from outside the window, so the pause is almost never what anybody wanted. Set in memory rather than saved, so it does not outlive the mod |
+| Mouse input | **Locked on world load. `devbridge.lockInput=false` opts out** | Removing the pause removed the thing that stopped a stray alt-tab turning the camera mid-shoot. Locked by default because that accident is the default way of working |
+| Behaviour switches | **System properties defaulting to on, plus a verb each** | These are ergonomics, not the security boundary, which is why they are options when the bind address is not. Default on so the common case needs no arguments; a launch property for "never do this to me", a verb for "not right now". Only the exact string `false` turns one off, so a typo leaves the default rather than silently disabling it |
 
 ## 2. Security, stated plainly
 
@@ -56,7 +59,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "run/screenshots/museum.png"}
 
 {"verb": "ping"}
-{"ok": true, "side": "integrated", "mcVersion": "26.1.2"}
+{"ok": true, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "pauseOnLostFocus": false, "inputLocked": true}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a
@@ -66,10 +69,12 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 
 | Verb | Runs on | Notes |
 |---|---|---|
-| `ping` | either | Reports which side answered and the MC version. The handshake `gamebridge wait` polls |
+| `ping` | either | Reports which side answered, the MC version, and on a client whether it pauses when unfocused and whether the mouse is locked. The handshake `gamebridge wait` polls |
 | `cmd` | server thread | Executes with output captured. As the server console by default, or as a named `player` - see section 9 |
 | `screenshot` | client render thread | Names the file rather than taking the timestamped default, so a tool can find what it just took |
 | `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
+| `input` | client render thread | Hands the mouse back, or takes it again. Locked automatically on world load |
+| `pause` | client render thread | Restores pausing on lost focus, or turns it off again. Off automatically on world load |
 | `stop` | either | Closes the world and quits. Lets a script own the whole lifecycle |
 
 ## 4. The two threading traps

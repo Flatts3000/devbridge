@@ -52,12 +52,15 @@ published to any Maven repository, deliberately.
 - **Loopback only.** `new ServerSocket(port, 1, InetAddress.getLoopbackAddress())`. Never
   `new ServerSocket(port)`, which binds every interface and publishes an arbitrary-command endpoint to
   the network. Not exposed as an option.
-- **Off unless asked.** No `-Ddevbridge.port` means no socket and no handlers.
+- **Off unless asked.** No `-Ddevbridge.port` means no socket and no handlers. The two behaviour
+  properties (`devbridge.keepTicking`, `devbridge.lockInput`) default to on, which is fine because
+  they only ever apply inside that gate: they are ergonomics, not the boundary.
 - **Never ship it.** Separate jar, not a dependency of anything released.
 
 ## Architecture
 
-Five classes, and the layering between the last three is a load-bearing safety property, not taste.
+Seven classes, and the split between the server-safe four and the client-only three is a
+load-bearing safety property, not taste.
 
 - **`DevBridge`** - the `@Mod` entry point. Reads `devbridge.port`; if unset or unparseable it logs
   and registers nothing at all. Otherwise it subscribes to `ServerStartedEvent` / `ServerStoppingEvent`
@@ -71,10 +74,14 @@ Five classes, and the layering between the last three is a load-bearing safety p
 - **`Handlers`** - the verb switch (`ping`, `cmd`, `stop`, plus the two that delegate to the client)
   and the `ok()` / `error()` reply builders. Owns the command-output capture and `findPlayer`.
   Unknown verbs fail loudly.
-- **`ClientHandlers`** - the dist guard. Answers `available()` and refuses `screenshot` and `hud`
-  with a message when there is no client.
-- **`ScreenshotTaker`** - the only class that touches `Minecraft`. Holds both client verbs, the
-  capture and the HUD toggle. Reached solely through `ClientHandlers` after the guard passes.
+- **`ClientHandlers`** - the dist guard. Answers `available()` and refuses every client verb
+  (`screenshot`, `hud`, `input`, `pause`) with a message when there is no client. Also the one place
+  the automatic world-load setup and the extra `ping` fields go through, so nothing else has to know
+  which side it is on.
+- **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`** - the only classes that touch
+  `Minecraft`, reached solely through `ClientHandlers` after the guard passes. Capture and HUD
+  toggle, pause-on-lost-focus, and the mouse lock respectively. Adding a client-only class means
+  adding it to the list in `check_invariants.sh`, which is deliberate friction.
 
 Request flow: socket thread parses, `Handlers` queues onto the server thread (`server.execute`) or the
 render thread (`Minecraft.execute`), socket thread blocks on a `CompletableFuture` with a 30s timeout,
@@ -113,6 +120,19 @@ the remaining open work (forcing a screenshot resolution).
   framebuffer as it already is, so hiding the HUD and grabbing in the same call still catches the
   frame drawn with it up. Anything that "simplifies" this by folding the toggle into the capture is
   reintroducing the bug.
+- **A toggle verb with no field restores vanilla.** `hud` shows, `input` gives the mouse back,
+  `pause` restores pausing on lost focus. `false` gets the devbridge behaviour. Keep new toggles on
+  that rule; an exception costs more than the verb is worth.
+- **The pause and the mouse lock are one decision, not two.** Turning off pause-on-lost-focus is
+  what makes an unfocused client answer at all, and it is also what lets a stray alt-tab turn the
+  camera, because the pause screen was the thing that used to catch that. Removing `InputLock`
+  without putting the pause back leaves the hazard with nothing covering it.
+- **The lock is an ungrabbed mouse, nothing more.** `MouseHandler.turnPlayer` runs only while the
+  mouse is grabbed. Two things re-grab it: a world click, cancelled through
+  `InputEvent.MouseButton.Pre` (which `ClientHooks.onMouseButtonPre` fires *before* `grabMouse`),
+  and closing a screen, which has no pre-event and is caught by the client tick listener instead.
+  The click cancel is skipped whenever a screen or overlay is open, or you could not click Back to
+  Game.
 
 ## Conventions
 

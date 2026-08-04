@@ -25,6 +25,8 @@ body:
         - cmd
         - screenshot
         - hud
+        - input
+        - pause
         - stop
         - "Connecting at all"
         - Other
@@ -60,9 +62,9 @@ body:
     attributes:
       label: How the instance was launched
       description: >-
-        The run configuration or command line, including the `devbridge.port` property and any
-        `programArguments`. Note that `--args` on a moddev Gradle run is taken as a main class and
-        will not do what you meant.
+        The run configuration or command line, including the `devbridge.port` property, any
+        `devbridge.keepTicking` or `devbridge.lockInput` overrides, and any `programArguments`. Note
+        that `--args` on a moddev Gradle run is taken as a main class and will not do what you meant.
       render: shell
     validations:
       required: true
