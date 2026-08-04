@@ -1,0 +1,104 @@
+name: Bug report
+description: Something the bridge does wrong, or does not do at all.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Not for security reports. If the socket is reachable from another machine, or opens without
+        `-Ddevbridge.port`, close this and use the Security tab instead.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: verb
+    attributes:
+      label: Which verb
+      options:
+        - ping
+        - cmd
+        - screenshot
+        - hud
+        - stop
+        - "Connecting at all"
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: request
+    attributes:
+      label: The request you sent and the reply you got
+      description: The raw JSON lines, both directions. `{"ok":false,"error":"..."}` replies are the useful ones.
+      render: json
+
+  - type: input
+    id: versions
+    attributes:
+      label: Minecraft and NeoForge versions
+      placeholder: "26.1.2 / 26.1.2.76"
+    validations:
+      required: true
+
+  - type: input
+    id: devbridge-version
+    attributes:
+      label: devbridge version
+      description: The jar filename, or the commit if you built it yourself.
+      placeholder: devbridge-26.1.2-0.1.0.jar
+    validations:
+      required: true
+
+  - type: textarea
+    id: launch
+    attributes:
+      label: How the instance was launched
+      description: >-
+        The run configuration or command line, including the `devbridge.port` property and any
+        `programArguments`. Note that `--args` on a moddev Gradle run is taken as a main class and
+        will not do what you meant.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: side
+    attributes:
+      label: Which side
+      description: What `ping` reports, if you got that far.
+      options:
+        - "Integrated (singleplayer, started by a client)"
+        - "Dedicated server"
+        - "Do not know"
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant log lines
+      description: >-
+        The `devbridge` lines from the game log, plus any stack trace. It logs whether it is idle,
+        what it is listening on, and every connection failure.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you file
+      options:
+        - label: >-
+            I connected to `localhost`, not the `127.0.0.1` literal. The loopback address can resolve
+            to `::1`, and dialling IPv4 then reports "connection refused" from a healthy socket.
+          required: true
+        - label: >-
+            If a command placed things correctly but did not move the camera, I passed a `player`
+            field. Without one, `cmd` runs as the console, which has no entity and sits at world
+            spawn, so `@s` matches nothing and `~` is spawn-relative.
+          required: true

@@ -1,0 +1,46 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only. Nothing in this workflow writes to the repository; the release workflow is the only
+# thing that needs more, and it asks for it there.
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # First, and before the slow part. This is the security boundary, it takes milliseconds, and
+      # there is no reason to spend a Minecraft decompile finding out the bind address changed.
+      - name: Check security invariants
+        run: sh .github/scripts/check_invariants.sh
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Caches ~/.gradle. The first run on a new cache key downloads and decompiles Minecraft, which
+      # is minutes; cached runs are not.
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: devbridge-jar
+          path: build/libs/*.jar
+          if-no-files-found: error

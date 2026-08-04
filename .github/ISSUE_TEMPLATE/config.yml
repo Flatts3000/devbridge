@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Flatts3000/devbridge/security/advisories/new
+    about: >-
+      Never open a public issue for a security report. Read SECURITY.md first: running arbitrary
+      commands and having no authentication are the design, not bugs. A break in the loopback-only
+      bind or the opt-in gate is a real report, and this is where it goes.
+
+  - name: Read the spec before requesting a feature
+    url: https://github.com/Flatts3000/devbridge/blob/main/SPEC.md
+    about: >-
+      Section 8 is what is deliberately out of scope, section 10 is what is still open. Anything a
+      Minecraft command can already do is out of scope by design.

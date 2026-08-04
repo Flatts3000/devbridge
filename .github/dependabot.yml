@@ -1,0 +1,21 @@
+version: 2
+
+updates:
+  # The action versions in .github/workflows. Without this they rot quietly until a runner drops
+  # support for the node version they pin.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
+
+  # Gradle plugins and the NeoForge coordinates. Minecraft and NeoForge versions are pinned in
+  # gradle.properties and move together deliberately, so expect to close some of these: bumping
+  # NeoForge without the matching Minecraft version is not an upgrade, it is a broken build.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"

@@ -34,6 +34,19 @@ repo.
 Version, mod metadata, and MC/NeoForge coordinates all live in `gradle.properties` and are expanded
 into `neoforge.mods.toml` at build time. Change them there, never in the toml.
 
+### CI and releases
+
+`.github/workflows/build.yml` runs the invariant check, then `./gradlew build`, on every push to
+`main` and every PR. `.github/scripts/check_invariants.sh` is the security boundary made executable:
+it fails if a `ServerSocket` is constructed without `InetAddress.getLoopbackAddress()` on the same
+line, if a wildcard address appears anywhere, if `DevBridge` stops reading `devbridge.port`, or if
+`build.gradle` gains a publishing block. Run it locally with `sh .github/scripts/check_invariants.sh`
+before pushing. It is strict by design and false-positives on reformatting; keep the formatting it
+wants rather than loosening the check.
+
+Releases are tag-driven: push a `v*` tag and `release.yml` builds and attaches the jar. Nothing is
+published to any Maven repository, deliberately.
+
 ## The rules that are not negotiable
 
 - **Loopback only.** `new ServerSocket(port, 1, InetAddress.getLoopbackAddress())`. Never
@@ -55,20 +68,21 @@ Five classes, and the layering between the last three is a load-bearing safety p
   line, parse JSON, hand to `Handlers.dispatch`, write one line back. Any exception becomes an error
   reply rather than a dropped connection: a tool that gets an error line can say what went wrong, one
   whose socket died can only say "broken".
-- **`Handlers`** - the verb switch (`ping`, `cmd`, `stop`) plus the `ok()` / `error()` reply builders.
-  Owns the command-output capture. Unknown verbs fail loudly.
-- **`ClientHandlers`** - the dist guard. Answers `available()` and refuses `screenshot` with a message
-  when there is no client.
-- **`ScreenshotTaker`** - the only class that touches `Minecraft`. Reached solely through
-  `ClientHandlers` after the guard passes.
+- **`Handlers`** - the verb switch (`ping`, `cmd`, `stop`, plus the two that delegate to the client)
+  and the `ok()` / `error()` reply builders. Owns the command-output capture and `findPlayer`.
+  Unknown verbs fail loudly.
+- **`ClientHandlers`** - the dist guard. Answers `available()` and refuses `screenshot` and `hud`
+  with a message when there is no client.
+- **`ScreenshotTaker`** - the only class that touches `Minecraft`. Holds both client verbs, the
+  capture and the HUD toggle. Reached solely through `ClientHandlers` after the guard passes.
 
 Request flow: socket thread parses, `Handlers` queues onto the server thread (`server.execute`) or the
 render thread (`Minecraft.execute`), socket thread blocks on a `CompletableFuture` with a 30s timeout,
 then writes the reply.
 
-Protocol shape and verb table are in `README.md`; `SPEC.md` carries the design rationale, what is
-deliberately out of scope, and the open work (a `player` field on `cmd`, hiding the HUD, forcing a
-screenshot resolution).
+Protocol shape and verb table are in `README.md`; `SPEC.md` carries the design rationale, section 8
+is what is deliberately out of scope, section 9 is what has been resolved and why, and section 10 is
+the remaining open work (forcing a screenshot resolution).
 
 ## Things that cost time to rediscover
 
@@ -90,9 +104,15 @@ screenshot resolution).
   `message` (the chat component's text) and `dir` only, because the timestamped default name is chosen
   inside `Screenshot.grab` and never handed back. README and SPEC show the named case; do not assume
   `path` is always present.
-- **Commands run as the console.** `@s` matches nothing and `~` is spawn-relative, so a function
-  ending in `tp @s ...` places its scene correctly and silently fails to move the camera. Known gap,
-  tracked in `SPEC.md` section 9.
+- **Commands run as the console unless the request names a `player`.** The console stack has no
+  entity and sits at world spawn, so `@s` matches nothing and `~` is spawn-relative: a function
+  ending in `tp @s ...` places its scene correctly and silently fails to move the camera. With a
+  `player`, `findPlayer` resolves the name (or takes the only player online for `@s` / `@p` / blank)
+  and the command runs on that player's own source stack.
+- **`hud` is a separate verb, not a flag on `screenshot`.** `Screenshot.grab` captures the
+  framebuffer as it already is, so hiding the HUD and grabbing in the same call still catches the
+  frame drawn with it up. Anything that "simplifies" this by folding the toggle into the capture is
+  reintroducing the bug.
 
 ## Conventions
 
