@@ -1,0 +1,151 @@
+# devbridge - spec
+
+**Status: built, phases 1 to 3.** Verified end to end on 26.1.2: a command placed a scene in a singleplayer world and a screenshot came back, both from the CLI with nobody touching the game. A dev-only mod that lets tooling outside the game drive a running
+Minecraft instance: run commands, take screenshots, and read the answers back.
+
+## 0. Why, given gamebridge already exists
+
+`gamebridge` talks to a **dedicated server** over RCON. That covers a lot and needs no mod code, and
+where it works it should stay the answer. It cannot do two things, and both are structural rather than
+missing features:
+
+- **Singleplayer.** The integrated server does not listen on a socket at all. There is no interface to
+  reach, so reaching one means code running inside the game.
+- **Screenshots.** RCON talks to a server. A screenshot is a client concern, and the dedicated server
+  has no client, no framebuffer and nothing to capture.
+
+The second is the one that matters. The showcase loop is currently *place, verify, then ask a human to
+press F2*, and the human is the slow part - every reframing of the museum cost a round trip. With
+screenshots in the loop, "change a number, rebuild, reshoot, look" is one command.
+
+## 1. Decisions
+
+| Decision | Answer | Why |
+|---|---|---|
+| Shape | **A separate mod jar**, not a source set inside a mod | It cannot leak into a release if it is never part of one. A `src/dev` folder relies on somebody keeping it out of the build forever |
+| Home | `mc-pack-toolkit/devbridge/`, its own Gradle project | The toolkit is where cross-mod tooling lives. Any mod's dev run can drop the jar in; nothing about it is Recompile-specific |
+| Transport | **Loopback TCP, newline-delimited JSON** | Same shape as RCON so `gamebridge` can speak both, but trivially implementable on both sides. JSON because a screenshot reply carries a path and an error carries a message |
+| Off by default | **Requires `-Ddevbridge.port=<n>`** | Present-but-inert is the safe default. With no property the mod registers nothing and opens no socket |
+| Binding | **127.0.0.1 only, never 0.0.0.0** | This executes arbitrary commands. See the security note, which is not a formality |
+| Auth | **None, and that is why binding matters** | A token on a loopback-only socket protects against nothing that loopback does not already exclude, and would be one more thing to keep in sync |
+| Client vs server verbs | **Both, in one mod** | Commands need the server thread, screenshots need the client render thread. In singleplayer both live in one process, which is exactly the case RCON cannot serve |
+
+## 2. Security, stated plainly
+
+**This is remote code execution by design.** `/execute` can run any command, commands can rewrite the
+world, and NeoForge dev runs often have a filesystem the game can reach. Three rules follow, and none
+of them are optional:
+
+1. **Bind to `127.0.0.1`.** Not a configurable host. There is no legitimate reason for another machine
+   to drive your dev client, and "it is only my LAN" is how this becomes a story.
+2. **Never ship the jar.** It lives in `run/mods/` or a dev-only dependency. It is not published, and
+   it is not a `runtimeOnly` of anything that gets released.
+3. **Opt in per launch** with `-Ddevbridge.port`. A jar left in a folder does nothing on its own.
+
+If those three hold, the exposure is the same as a terminal on the same machine already having.
+
+## 3. Protocol
+
+Newline-delimited JSON, one request per line, one reply per line.
+
+```json
+{"verb": "cmd", "command": "function recompile:showcase/museum"}
+{"ok": true, "output": "Running function recompile:showcase/museum"}
+
+{"verb": "screenshot", "name": "museum"}
+{"ok": true, "path": "run/screenshots/museum.png"}
+
+{"verb": "ping"}
+{"ok": true, "side": "integrated", "mcVersion": "26.1.2"}
+```
+
+`{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a
+silently accepted typo is the worst outcome for a tool whose whole job is telling you what happened.
+
+### Verbs
+
+| Verb | Runs on | Notes |
+|---|---|---|
+| `ping` | either | Reports which side answered and the MC version. The handshake `gamebridge wait` polls |
+| `cmd` | server thread | Executes as the server console at world spawn, with output captured |
+| `screenshot` | client render thread | Names the file rather than taking the timestamped default, so a tool can find what it just took |
+| `stop` | either | Closes the world and quits. Lets a script own the whole lifecycle |
+
+## 4. The two threading traps
+
+**Commands must run on the server thread.** Executing one straight off the socket thread races
+everything and will eventually corrupt a chunk. The handler queues onto the server via
+`server.execute(...)` and blocks the socket thread on a future until it completes.
+
+**Screenshots must run on the client render thread**, and only after a frame has been drawn. The
+capture goes through `Minecraft.getInstance().execute(...)`, and the reply is sent when the write
+callback fires, not when the request was accepted. Replying early would hand a tool a path to a file
+that does not exist yet, which is the kind of bug that only shows up under load.
+
+**Capturing command output** needs a `CommandSource` wrapper that collects `sendSystemMessage` rather
+than the default that discards it. Without that, `cmd` can only report that something ran, which is the
+half `gamebridge` already provides and not the half worth building.
+
+## 5. Loading it into a dev run
+
+```
+run/mods/devbridge-0.1.0.jar
+```
+
+then launch with `-Ddevbridge.port=25580`. In a Gradle moddev run:
+
+```groovy
+runs {
+    client {
+        client()
+        systemProperty 'devbridge.port', '25580'
+    }
+}
+```
+
+Combined with vanilla's `--quickPlaySingleplayer <world>` launch argument, a client boots straight into
+a named singleplayer world with the bridge open, and no human has touched anything.
+
+## 6. gamebridge speaks both
+
+`gamebridge` gains a transport flag. Everything else about the CLI is unchanged, so the same verify
+scripts work against either:
+
+```
+gamebridge --devbridge 25580 cmd "function recompile:showcase/museum"
+gamebridge --devbridge 25580 shot museum
+```
+
+RCON stays the default for dedicated servers. The two transports answer the same verbs; only
+`screenshot` is devbridge-only, and it fails with a clear message over RCON rather than hanging.
+
+## 7. Build order
+
+1. **`ping` and `cmd` over the socket, server side only.** Proves the transport and the threading, and
+   is already useful: it is RCON for singleplayer.
+2. **`screenshot`.** The reason to build this at all.
+3. **`gamebridge` transport flag**, so existing scripts keep working.
+4. **A one-command showcase loop**: launch, quickplay into the studio world, place a scene, shoot it,
+   quit. This is the point the whole thing has been aiming at.
+
+## 8. Out of scope
+
+- **Anything a command can already do.** No bespoke verbs for teleporting or setting time; `cmd` covers
+  them and every one added is a thing to maintain.
+- **Running in production.** Not a debug tool for shipped mods, not a server admin tool. RCON exists.
+- **Rendering without a window.** Minecraft needs a real GL context; there is no headless client. The
+  window opens, it just does not need anybody looking at it.
+
+## 9. Open
+
+- **`cmd` needs a "run as this player" option. CONFIRMED, not theoretical.** Commands run as the
+  console, so `@s` matches nothing and `~` is spawn-relative: running the museum function over the
+  bridge placed the set correctly and silently did nothing for its `tp @s`, leaving the camera
+  wherever it already was. Every showcase function ends in a `tp @s`, so this is the difference
+  between "place a scene" and "take the shot". The fix is a `player` field on the request, resolved
+  to a `ServerPlayer` and used as the command source's entity.
+- **The HUD is in the picture.** Hotbar, crosshair and held item all render into the capture, which
+  makes it unusable for a gallery. `Minecraft.getInstance().options.hideGui` is the switch; it wants a
+  verb, or a flag on `screenshot` that sets it, captures, and restores it.
+- **Screenshot resolution.** Whether to force a window size for reproducible framing, or accept
+  whatever the window happens to be. Probably force it, since the gallery wants consistent dimensions.

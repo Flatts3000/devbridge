@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.141'
+}
+
+base {
+    archivesName = "${mod_id}-${minecraft_version}"
+}
+
+group = mod_group_id
+version = mod_version
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+neoForge {
+    version = neoforge_version
+    // No run configs of its own. This mod exists to be dropped into ANOTHER mod's dev run, so a
+    // client/server pair here would only ever launch a world with nothing in it.
+}
+
+tasks.withType(ProcessResources).configureEach {
+    def replacements = [
+        mod_id: mod_id, mod_name: mod_name, mod_version: mod_version,
+        mod_license: mod_license, mod_authors: mod_authors, mod_description: mod_description,
+        minecraft_version_range: minecraft_version_range,
+        neoforge_loader_version_range: neoforge_loader_version_range,
+    ]
+    inputs.properties replacements
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replacements
+    }
+}
