@@ -55,6 +55,13 @@ runs {
     client {
         client()
         systemProperty 'devbridge.port', '25580'
+
+        // Both default to true and only 'false' turns one off.
+        // keepTicking: keep the world running while the window is in the background.
+        // lockInput:   take the mouse on world load so a stray alt-tab cannot move the camera.
+        // systemProperty 'devbridge.keepTicking', 'false'
+        // systemProperty 'devbridge.lockInput', 'false'
+
         // Optional: boot straight into a world instead of stopping at the title screen.
         // NOTE: `--args` on the Gradle task does NOT do this - moddev takes it as a main class.
         programArguments.addAll '--quickPlaySingleplayer', 'My World'
@@ -70,14 +77,16 @@ this mod involves the window not being focused, and a singleplayer world left to
 pause screen half a second after you click away - which stops the integrated server ticking. Your
 next `cmd` would sit in the queue until somebody clicked back into the game, and your next
 `screenshot` would be a picture of the pause menu. It is not saved to your options, so it lasts the
-session and leaves nothing behind; press F3+P if you want the pause back.
+session and leaves nothing behind; press F3+P, send `{"verb":"pause"}`, or start with
+`-Ddevbridge.keepTicking=false` if you want the pause back.
 
 **Loading a world also locks the mouse, because taking the pause away took a safety net with it.** A
 world that keeps ticking in the background is one you can alt-tab into and nudge, and the smallest
 movement turns the camera: a shot your command framed is quietly no longer that shot. The lock just
 leaves the mouse ungrabbed, so moving it over the window does what moving it over any other
 background window does. Menus still take clicks. Hand the mouse back with `{"verb":"input"}` when you
-want to fly around and frame something by eye, and every world load takes it again.
+want to fly around and frame something by eye, and every world load takes it again. Start with
+`-Ddevbridge.lockInput=false` if you would rather it never took it.
 
 ## Protocol
 
@@ -85,12 +94,22 @@ One request per line, one reply per line.
 
 | Verb | Runs on | Request fields | Reply |
 |---|---|---|---|
-| `ping` | either | none | `{"ok":true,"side":"integrated","mcVersion":"26.1.2","hasClient":true}` |
+| `ping` | either | none | `{"ok":true,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"pauseOnLostFocus":false,"inputLocked":true}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
 | `screenshot` | client render thread | optional `name` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
 | `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
+| `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
 | `stop` | either | none | Closes the world and quits |
+
+The last two `ping` fields are client-only and absent on a dedicated server, where `hasClient` has
+already said so. They are there because "will this client answer while I am looking at my terminal"
+is a question worth being able to ask, rather than one you answer by waiting for a reply that never
+comes.
+
+**A toggle verb with no field puts the game back the way vanilla has it.** `{"verb":"hud"}` shows the
+HUD, `{"verb":"input"}` gives the mouse back, `{"verb":"pause"}` restores pausing on lost focus. Pass
+`false` to get the devbridge behaviour instead. Nothing to memorise: bare means vanilla.
 
 Failures are `{"ok":false,"error":"..."}`. An unknown verb fails rather than being ignored: silently
 accepting a typo is the worst outcome for a tool whose whole job is reporting what happened.

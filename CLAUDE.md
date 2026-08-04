@@ -52,7 +52,9 @@ published to any Maven repository, deliberately.
 - **Loopback only.** `new ServerSocket(port, 1, InetAddress.getLoopbackAddress())`. Never
   `new ServerSocket(port)`, which binds every interface and publishes an arbitrary-command endpoint to
   the network. Not exposed as an option.
-- **Off unless asked.** No `-Ddevbridge.port` means no socket and no handlers.
+- **Off unless asked.** No `-Ddevbridge.port` means no socket and no handlers. The two behaviour
+  properties (`devbridge.keepTicking`, `devbridge.lockInput`) default to on, which is fine because
+  they only ever apply inside that gate: they are ergonomics, not the boundary.
 - **Never ship it.** Separate jar, not a dependency of anything released.
 
 ## Architecture
@@ -116,6 +118,9 @@ the remaining open work (forcing a screenshot resolution).
   framebuffer as it already is, so hiding the HUD and grabbing in the same call still catches the
   frame drawn with it up. Anything that "simplifies" this by folding the toggle into the capture is
   reintroducing the bug.
+- **A toggle verb with no field restores vanilla.** `hud` shows, `input` gives the mouse back,
+  `pause` restores pausing on lost focus. `false` gets the devbridge behaviour. Keep new toggles on
+  that rule; an exception costs more than the verb is worth.
 - **The pause and the mouse lock are one decision, not two.** Turning off pause-on-lost-focus is
   what makes an unfocused client answer at all, and it is also what lets a stray alt-tab turn the
   camera, because the pause screen was the thing that used to catch that. Removing `InputLock`

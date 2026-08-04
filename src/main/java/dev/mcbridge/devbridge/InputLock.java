@@ -54,9 +54,15 @@ final class InputLock {
         if (!locked) {
             DevBridge.LOGGER.info(
                 "devbridge locked mouse input, so alt-tabbing into the window cannot turn the "
-                    + "camera. Send {\"verb\":\"input\"} to hand it back.");
+                    + "camera. Send {\"verb\":\"input\"} to hand it back, or start with -D{}=false "
+                    + "to never take it.", DevBridge.LOCK_INPUT_PROPERTY);
         }
         apply(true);
+    }
+
+    /** For {@code ping}. Volatile, so this is the state the render thread is actually acting on. */
+    static boolean isLocked() {
+        return locked;
     }
 
     private static synchronized void apply(boolean lock) {

@@ -1,5 +1,6 @@
 package dev.mcbridge.devbridge;
 
+import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -34,7 +35,31 @@ final class ClientOptions {
             client.options.pauseOnLostFocus = false;
             DevBridge.LOGGER.info(
                 "devbridge turned off pause-on-lost-focus, so the world keeps ticking while the "
-                    + "window is in the background. Not saved: F3+P restores it for this session.");
+                    + "window is in the background. Not saved: F3+P restores it for this session. "
+                    + "Turn this off with -D{}=false.", DevBridge.KEEP_TICKING_PROPERTY);
         });
+    }
+
+    /**
+     * The {@code pause} verb. {@code enabled} is vanilla's behaviour, so enabling it is asking the
+     * client to stop answering while you are looking at something else.
+     */
+    static JsonObject setPause(boolean enabled) {
+        Minecraft client = Minecraft.getInstance();
+        client.execute(() -> client.options.pauseOnLostFocus = enabled);
+        JsonObject reply = Handlers.ok();
+        reply.addProperty("pauseOnLostFocus", enabled);
+        return reply;
+    }
+
+    /**
+     * What the option says right now, for {@code ping}.
+     *
+     * <p>Read straight off the socket thread. It is a plain field, so this can lag a write by a
+     * frame, and a status line is not worth a round trip to the render thread to avoid that. Reading
+     * the real field rather than a mirror is also the only way to notice somebody pressing F3+P.
+     */
+    static boolean pausesOnLostFocus() {
+        return Minecraft.getInstance().options.pauseOnLostFocus;
     }
 }

@@ -48,15 +48,40 @@ final class ClientHandlers {
         return InputLock.set(enabled);
     }
 
+    static JsonObject pause(MinecraftServer server, boolean enabled) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a dedicated server has no window to "
+                + "lose focus and never pauses for one");
+        }
+        return ClientOptions.setPause(enabled);
+    }
+
     /**
      * Stop the game pausing itself when its window loses focus, and stop a stray hand turning the
-     * camera now that nothing pauses. Silent on a dedicated server, which has neither a window to
-     * lose focus nor a mouse to grab.
+     * camera now that nothing pauses. Each half obeys its own system property. Silent on a
+     * dedicated server, which has neither a window to lose focus nor a mouse to grab.
      */
-    static void prepareForRemoteControl(MinecraftServer server) {
-        if (available(server)) {
+    static void prepareForRemoteControl(MinecraftServer server, boolean keepTicking,
+            boolean lockInput) {
+        if (!available(server)) {
+            return;
+        }
+        if (keepTicking) {
             ClientOptions.keepRunningUnfocused();
+        }
+        if (lockInput) {
             InputLock.lock();
+        }
+    }
+
+    /**
+     * Add whatever client state a caller would otherwise have to discover by timing out. Does
+     * nothing on a dedicated server, where {@code hasClient} has already said as much.
+     */
+    static void describe(JsonObject reply, MinecraftServer server) {
+        if (available(server)) {
+            reply.addProperty("pauseOnLostFocus", ClientOptions.pausesOnLostFocus());
+            reply.addProperty("inputLocked", InputLock.isLocked());
         }
     }
 }
