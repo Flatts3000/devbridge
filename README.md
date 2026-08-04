@@ -44,6 +44,10 @@ on a loopback-only socket defends against nothing loopback does not already excl
 
 ## Use
 
+Grab the jar from [Releases](https://github.com/Flatts3000/devbridge/releases), or build it yourself
+with `./gradlew build`. It is published to no Maven repository on purpose, so there is nothing to add
+to a dependency block and no way for it to end up in one by accident.
+
 Drop the jar in your dev run's `run/mods/`, then in your mod's `build.gradle`:
 
 ```groovy
