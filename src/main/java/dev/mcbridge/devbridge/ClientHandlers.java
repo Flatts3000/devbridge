@@ -9,7 +9,8 @@ import net.minecraft.server.MinecraftServer;
  * <p><b>This class must not mention {@code Minecraft}.</b> A dedicated server has no client classes
  * at all, and the JVM resolves a method's types when it verifies the method - so a single reference
  * here would crash a server the moment {@code ping} touched this file. The actual capture lives in
- * {@link ScreenshotTaker}, which is only ever loaded after the check below has passed.
+ * {@link ScreenshotTaker}, the option tweaks in {@link ClientOptions} and the mouse lock in
+ * {@link InputLock}, none of which are ever loaded until the check below has passed.
  *
  * <p>The check is {@code isDedicatedServer}, not an FML dist lookup. An integrated server exists
  * because a client started it, so the server already knows the answer and no loader API is involved.
@@ -38,5 +39,24 @@ final class ClientHandlers {
             return Handlers.error("no client on this side: the HUD is a client thing");
         }
         return ScreenshotTaker.hud(show);
+    }
+
+    static JsonObject input(MinecraftServer server, boolean enabled) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: there is no mouse to lock");
+        }
+        return InputLock.set(enabled);
+    }
+
+    /**
+     * Stop the game pausing itself when its window loses focus, and stop a stray hand turning the
+     * camera now that nothing pauses. Silent on a dedicated server, which has neither a window to
+     * lose focus nor a mouse to grab.
+     */
+    static void prepareForRemoteControl(MinecraftServer server) {
+        if (available(server)) {
+            ClientOptions.keepRunningUnfocused();
+            InputLock.lock();
+        }
     }
 }

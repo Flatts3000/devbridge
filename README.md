@@ -65,6 +65,20 @@ runs {
 Then talk to it with any client that speaks newline-delimited JSON over TCP. The reference one is
 `gamebridge`, a small Python CLI.
 
+**Loading a world turns off pause-on-lost-focus for you, the same as pressing F3+P.** Every use of
+this mod involves the window not being focused, and a singleplayer world left to itself opens the
+pause screen half a second after you click away - which stops the integrated server ticking. Your
+next `cmd` would sit in the queue until somebody clicked back into the game, and your next
+`screenshot` would be a picture of the pause menu. It is not saved to your options, so it lasts the
+session and leaves nothing behind; press F3+P if you want the pause back.
+
+**Loading a world also locks the mouse, because taking the pause away took a safety net with it.** A
+world that keeps ticking in the background is one you can alt-tab into and nudge, and the smallest
+movement turns the camera: a shot your command framed is quietly no longer that shot. The lock just
+leaves the mouse ungrabbed, so moving it over the window does what moving it over any other
+background window does. Menus still take clicks. Hand the mouse back with `{"verb":"input"}` when you
+want to fly around and frame something by eye, and every world load takes it again.
+
 ## Protocol
 
 One request per line, one reply per line.
@@ -75,6 +89,7 @@ One request per line, one reply per line.
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
 | `screenshot` | client render thread | optional `name` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
+| `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
 | `stop` | either | none | Closes the world and quits |
 
 Failures are `{"ok":false,"error":"..."}`. An unknown verb fails rather than being ignored: silently

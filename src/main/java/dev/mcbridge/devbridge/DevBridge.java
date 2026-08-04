@@ -63,6 +63,12 @@ public class DevBridge {
     }
 
     private void onServerStarted(ServerStartedEvent event) {
+        // Before the socket check, so it is reasserted on every world load rather than only the
+        // first. Both settings are per-instance and free to set again, and a caller who pressed
+        // F3+P or unlocked the mouse in between should not have to work out why the tool went quiet
+        // on the next world.
+        ClientHandlers.prepareForRemoteControl(event.getServer());
+
         if (server != null) {
             return;   // singleplayer opens and closes worlds repeatedly; keep the first socket
         }

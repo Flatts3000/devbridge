@@ -25,6 +25,7 @@ body:
         - cmd
         - screenshot
         - hud
+        - input
         - stop
         - "Connecting at all"
         - Other

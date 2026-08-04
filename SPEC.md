@@ -29,6 +29,8 @@ screenshots in the loop, "change a number, rebuild, reshoot, look" is one comman
 | Binding | **127.0.0.1 only, never 0.0.0.0** | This executes arbitrary commands. See the security note, which is not a formality |
 | Auth | **None, and that is why binding matters** | A token on a loopback-only socket protects against nothing that loopback does not already exclude, and would be one more thing to keep in sync |
 | Client vs server verbs | **Both, in one mod** | Commands need the server thread, screenshots need the client render thread. In singleplayer both live in one process, which is exactly the case RCON cannot serve |
+| Focus pause | **Turned off on world load, not offered as a switch** | The pause screen stops the integrated server ticking, so an unfocused client answers nothing. Every use of this mod is from outside the window, so the pause is never the behaviour anybody wanted. Set in memory rather than saved, so it does not outlive the mod |
+| Mouse input | **Locked on world load, released by a verb** | Removing the pause removed the thing that stopped a stray alt-tab turning the camera mid-shoot. Locked by default because that accident is the default way of working; a verb rather than a permanent state because framing something by hand is still worth doing |
 
 ## 2. Security, stated plainly
 
@@ -70,6 +72,7 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `cmd` | server thread | Executes with output captured. As the server console by default, or as a named `player` - see section 9 |
 | `screenshot` | client render thread | Names the file rather than taking the timestamped default, so a tool can find what it just took |
 | `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
+| `input` | client render thread | Hands the mouse back, or takes it again. Locked automatically on world load |
 | `stop` | either | Closes the world and quits. Lets a script own the whole lifecycle |
 
 ## 4. The two threading traps

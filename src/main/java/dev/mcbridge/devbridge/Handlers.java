@@ -39,6 +39,8 @@ final class Handlers {
                 request.has("name") ? request.get("name").getAsString() : null);
             case "hud" -> ClientHandlers.hud(server,
                 !request.has("show") || request.get("show").getAsBoolean());
+            case "input" -> ClientHandlers.input(server,
+                !request.has("enabled") || request.get("enabled").getAsBoolean());
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a
             // tool whose entire job is reporting what happened.

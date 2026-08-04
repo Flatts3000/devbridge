@@ -87,8 +87,32 @@ if ! grep -q 'devbridge.port' src/main/java/dev/mcbridge/devbridge/DevBridge.jav
     fail "DevBridge no longer reads the devbridge.port property: the opt-in gate is gone."
 fi
 
+# ---------------------------------------------------------------------------
+# 5. No client class outside the client-only files.
+#
+# A dedicated server has no client classes at all, and the JVM resolves a method's types when it
+# verifies the method. One `net.minecraft.client` reference in a class the server touches crashes it
+# the moment something calls into that class, and the crash names a missing class rather than the
+# file that mentioned it. The client-only files below are reached solely through the
+# isDedicatedServer guard in ClientHandlers and are never loaded on a server.
+#
+# Adding a client-only class means adding it here, on purpose.
+# ---------------------------------------------------------------------------
+client_only="ScreenshotTaker.java ClientOptions.java InputLock.java"
+for f in $(find "$src" -name '*.java'); do
+    case " $client_only " in
+        *" $(basename "$f") "*) continue ;;
+    esac
+    offenders=$(grep -Hn -e 'net\.minecraft\.client' -e 'net\.neoforged\.neoforge\.client' "$f" | code_only)
+    if [ -n "$offenders" ]; then
+        echo "$offenders" >&2
+        fail "client class referenced outside the client-only files ($client_only)."
+    fi
+done
+
 if [ "$status" -eq 0 ]; then
-    echo "invariants OK: loopback-only bind, no wildcard address, not publishable, opt-in gated."
+    echo "invariants OK: loopback-only bind, no wildcard address, not publishable, opt-in gated,"
+    echo "no client classes outside $client_only."
 fi
 
 exit "$status"
