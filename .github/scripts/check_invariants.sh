@@ -103,7 +103,11 @@ for f in $(find "$src" -name '*.java'); do
     case " $client_only " in
         *" $(basename "$f") "*) continue ;;
     esac
-    offenders=$(grep -Hn -e 'net\.minecraft\.client' -e 'net\.neoforged\.neoforge\.client' "$f" | code_only)
+    offenders=$(grep -Hn \
+        -e 'net\.minecraft\.client' \
+        -e 'net\.neoforged\.neoforge\.client' \
+        -e 'com\.mojang\.blaze3d' \
+        "$f" | code_only)
     if [ -n "$offenders" ]; then
         echo "$offenders" >&2
         fail "client class referenced outside the client-only files ($client_only)."

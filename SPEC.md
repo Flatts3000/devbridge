@@ -59,7 +59,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "run/screenshots/museum.png"}
 
 {"verb": "ping"}
-{"ok": true, "side": "integrated", "mcVersion": "26.1.2"}
+{"ok": true, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "pauseOnLostFocus": false, "inputLocked": true}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a

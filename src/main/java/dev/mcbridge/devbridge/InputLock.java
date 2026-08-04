@@ -1,6 +1,7 @@
 package dev.mcbridge.devbridge;
 
 import com.google.gson.JsonObject;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
@@ -22,8 +23,9 @@ import net.neoforged.neoforge.common.NeoForge;
  *
  * <ul>
  *   <li><b>A click in the world.</b> Cancelling {@code InputEvent.MouseButton.Pre} returns before
- *       the grab. Only when no screen is open: with a screen the mouse is already released and the
- *       camera cannot turn, and cancelling there would leave somebody unable to click Back to Game.
+ *       the grab. Only presses, and only when no screen is open: with a screen the mouse is already
+ *       released and the camera cannot turn, and cancelling there would leave somebody unable to
+ *       click Back to Game.
  *   <li><b>Closing a screen</b>, which grabs on the way out. There is no event before that, so the
  *       tick listener releases it again. One tick of a screen close is the only window left.
  * </ul>
@@ -88,6 +90,13 @@ final class InputLock {
     }
 
     private static void onMouseButton(InputEvent.MouseButton.Pre event) {
+        // Presses only, and that is not tidiness. Cancelling this event returns before the vanilla
+        // fallback that runs KeyMapping.set(key, pressed), so swallowing a release leaves the button
+        // logically held: the player mines or uses an item forever, in the world this lock exists to
+        // hold still. Only a press can grab the mouse, so refusing presses is the whole job anyway.
+        if (event.getAction() != InputConstants.PRESS) {
+            return;
+        }
         Minecraft client = Minecraft.getInstance();
         if (locked && client.screen == null && client.getOverlay() == null) {
             event.setCanceled(true);

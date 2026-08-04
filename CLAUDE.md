@@ -74,8 +74,10 @@ load-bearing safety property, not taste.
 - **`Handlers`** - the verb switch (`ping`, `cmd`, `stop`, plus the two that delegate to the client)
   and the `ok()` / `error()` reply builders. Owns the command-output capture and `findPlayer`.
   Unknown verbs fail loudly.
-- **`ClientHandlers`** - the dist guard. Answers `available()` and refuses `screenshot` and `hud`
-  with a message when there is no client.
+- **`ClientHandlers`** - the dist guard. Answers `available()` and refuses every client verb
+  (`screenshot`, `hud`, `input`, `pause`) with a message when there is no client. Also the one place
+  the automatic world-load setup and the extra `ping` fields go through, so nothing else has to know
+  which side it is on.
 - **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`** - the only classes that touch
   `Minecraft`, reached solely through `ClientHandlers` after the guard passes. Capture and HUD
   toggle, pause-on-lost-focus, and the mouse lock respectively. Adding a client-only class means
