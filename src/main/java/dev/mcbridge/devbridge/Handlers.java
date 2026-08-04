@@ -10,6 +10,7 @@ import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * What the verbs do, and the two threads they have to do it on.
@@ -32,9 +33,12 @@ final class Handlers {
         String verb = request.has("verb") ? request.get("verb").getAsString() : "";
         return switch (verb) {
             case "ping" -> ping(server);
-            case "cmd" -> command(server, request.get("command").getAsString());
+            case "cmd" -> command(server, request.get("command").getAsString(),
+                request.has("player") ? request.get("player").getAsString() : null);
             case "screenshot" -> ClientHandlers.screenshot(server,
                 request.has("name") ? request.get("name").getAsString() : null);
+            case "hud" -> ClientHandlers.hud(server,
+                !request.has("show") || request.get("show").getAsBoolean());
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a
             // tool whose entire job is reporting what happened.
@@ -63,6 +67,20 @@ final class Handlers {
         return reply;
     }
 
+    /** By name, or the only player online when asked for {@code "@s"} or an empty name. */
+    private static ServerPlayer findPlayer(MinecraftServer server, String name) {
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
+        if (name.isBlank() || name.equals("@s") || name.equals("@p")) {
+            return players.isEmpty() ? null : players.get(0);
+        }
+        for (ServerPlayer player : players) {
+            if (player.getGameProfile().name().equalsIgnoreCase(name)) {
+                return player;
+            }
+        }
+        return null;
+    }
+
     private static JsonObject stop(MinecraftServer server) {
         JsonObject reply = ok();
         // Queued rather than called, so the reply is written before the world starts closing.
@@ -78,7 +96,8 @@ final class Handlers {
      * failure. Collecting it needs a {@link CommandSource} that keeps messages instead of the default
      * that drops them on the floor.
      */
-    private static JsonObject command(MinecraftServer server, String command) throws Exception {
+    private static JsonObject command(MinecraftServer server, String command, String playerName)
+            throws Exception {
         List<String> messages = new CopyOnWriteArrayList<>();
         CommandSource sink = new CommandSource() {
             @Override
@@ -108,7 +127,24 @@ final class Handlers {
                 // NOT withSuppressedOutput(): that is exactly the switch that would stop the
                 // messages this method exists to collect. createCommandSourceStack already carries
                 // LevelBasedPermissionSet.OWNER, so no permission call is needed either.
-                CommandSourceStack stack = server.createCommandSourceStack().withSource(sink);
+                //
+                // AS A PLAYER WHEN ASKED, and this is not a nicety. The console's stack has no entity
+                // and sits at world spawn, so `@s` matches nothing and `~` is spawn-relative. A
+                // function ending in `tp @s` then places everything correctly and silently fails to
+                // move the camera, which reads as the command having half-worked.
+                CommandSourceStack stack;
+                if (playerName == null) {
+                    stack = server.createCommandSourceStack();
+                } else {
+                    ServerPlayer player = findPlayer(server, playerName);
+                    if (player == null) {
+                        done.completeExceptionally(
+                            new IllegalArgumentException("no player named '" + playerName + "'"));
+                        return;
+                    }
+                    stack = player.createCommandSourceStack();
+                }
+                stack = stack.withSource(sink);
                 server.getCommands().performPrefixedCommand(stack, command.replaceFirst("^/", ""));
                 done.complete(null);
             } catch (Throwable t) {

@@ -22,6 +22,27 @@ final class ScreenshotTaker {
     private ScreenshotTaker() {
     }
 
+    /**
+     * Show or hide the HUD.
+     *
+     * <p>Its own verb rather than a flag on {@code screenshot}, because {@code Screenshot.grab}
+     * captures the framebuffer as it already is: hiding the HUD and grabbing in the same call would
+     * still catch the frame that was drawn with it. The caller hides it, takes the shot, and shows it
+     * again, which also lets several shots share one toggle.
+     */
+    static JsonObject hud(boolean show) throws Exception {
+        Minecraft client = Minecraft.getInstance();
+        CompletableFuture<Void> applied = new CompletableFuture<>();
+        client.execute(() -> {
+            client.options.hideGui = !show;
+            applied.complete(null);
+        });
+        applied.get(10, TimeUnit.SECONDS);
+        JsonObject reply = Handlers.ok();
+        reply.addProperty("hudVisible", show);
+        return reply;
+    }
+
     static JsonObject take(String name) throws Exception {
         Minecraft client = Minecraft.getInstance();
         CompletableFuture<String> written = new CompletableFuture<>();

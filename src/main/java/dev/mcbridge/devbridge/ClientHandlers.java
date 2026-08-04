@@ -32,4 +32,11 @@ final class ClientHandlers {
         }
         return ScreenshotTaker.take(name);
     }
+
+    static JsonObject hud(MinecraftServer server, boolean show) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: the HUD is a client thing");
+        }
+        return ScreenshotTaker.hud(show);
+    }
 }

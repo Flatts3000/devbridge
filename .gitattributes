@@ -1,0 +1,13 @@
+# Normalise line endings on the way in, so a Windows checkout cannot commit CRLF.
+* text=auto
+
+# gradlew is executed by /bin/sh on Linux CI runners. A CR on the shebang line makes it
+# "bad interpreter: no such file or directory", which reads as a missing shell rather than a
+# line-ending problem and costs an hour to find. Force LF regardless of core.autocrlf.
+gradlew text eol=lf
+*.sh text eol=lf
+
+gradlew.bat text eol=crlf
+
+*.jar binary
+*.png binary
