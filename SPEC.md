@@ -67,8 +67,9 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | Verb | Runs on | Notes |
 |---|---|---|
 | `ping` | either | Reports which side answered and the MC version. The handshake `gamebridge wait` polls |
-| `cmd` | server thread | Executes as the server console at world spawn, with output captured |
+| `cmd` | server thread | Executes with output captured. As the server console by default, or as a named `player` - see section 9 |
 | `screenshot` | client render thread | Names the file rather than taking the timestamped default, so a tool can find what it just took |
+| `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
 | `stop` | either | Closes the world and quits. Lets a script own the whole lifecycle |
 
 ## 4. The two threading traps
@@ -136,16 +137,26 @@ RCON stays the default for dedicated servers. The two transports answer the same
 - **Rendering without a window.** Minecraft needs a real GL context; there is no headless client. The
   window opens, it just does not need anybody looking at it.
 
-## 9. Open
+## 9. Resolved, and what the fix was
 
-- **`cmd` needs a "run as this player" option. CONFIRMED, not theoretical.** Commands run as the
-  console, so `@s` matches nothing and `~` is spawn-relative: running the museum function over the
-  bridge placed the set correctly and silently did nothing for its `tp @s`, leaving the camera
-  wherever it already was. Every showcase function ends in a `tp @s`, so this is the difference
-  between "place a scene" and "take the shot". The fix is a `player` field on the request, resolved
-  to a `ServerPlayer` and used as the command source's entity.
-- **The HUD is in the picture.** Hotbar, crosshair and held item all render into the capture, which
-  makes it unusable for a gallery. `Minecraft.getInstance().options.hideGui` is the switch; it wants a
-  verb, or a flag on `screenshot` that sets it, captures, and restores it.
+Both of these were found by the first automated screenshots rather than by reasoning about the code,
+which is the argument for building the loop before polishing it.
+
+- **`cmd` running as the console.** Commands executed with no entity and at world spawn, so `@s`
+  matched nothing and `~` was spawn-relative: running the museum function over the bridge placed the
+  set correctly and silently did nothing for its `tp @s`, leaving the camera wherever it already was.
+  Every showcase function ends in a `tp @s`, so this was the difference between "place a scene" and
+  "take the shot". Fixed by a `player` field on the request, resolved to a `ServerPlayer` whose own
+  command source stack is used. A name matches that player; `@s`, `@p` or blank take the only player
+  online. Omitting the field still runs as the console.
+- **The HUD was in every picture.** Hotbar, crosshair and held item all rendered into the capture,
+  which made it unusable for a gallery. Fixed by a `hud` verb over
+  `Minecraft.getInstance().options.hideGui`. Deliberately *not* a flag on `screenshot`:
+  `Screenshot.grab` takes the framebuffer as it already is, so hiding and grabbing in one call would
+  still catch the frame that was drawn with the HUD up. A caller hides, shoots, and shows again, and
+  a run of shots shares one toggle.
+
+## 10. Open
+
 - **Screenshot resolution.** Whether to force a window size for reproducible framing, or accept
   whatever the window happens to be. Probably force it, since the gallery wants consistent dimensions.
