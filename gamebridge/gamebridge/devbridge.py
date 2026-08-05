@@ -107,6 +107,23 @@ class DevBridge:
         """
         return self.request(verb="pause", enabled=enabled)
 
+    def screen(self, open: bool | None = None) -> dict:
+        """What GUI is open, or open the inventory / close what is open.
+
+        The reply carries the screen's width and height in GUI-scaled coordinates, which is the
+        space `cursor` and `click` work in. Work out where to point from those rather than from the
+        window size: they differ whenever the GUI scale is not 1.
+        """
+        return self.request(verb="screen", **({} if open is None else {"open": open}))
+
+    def cursor(self, x: float, y: float) -> dict:
+        """Move the pointer. This is what makes a tooltip render."""
+        return self.request(verb="cursor", x=x, y=y)
+
+    def click(self, x: float, y: float, button: int = 0) -> dict:
+        """Press and release at a point. Reply says whether anything took it."""
+        return self.request(verb="click", x=x, y=y, button=button)
+
     def screenshot(self, name: str | None = None,
                    width: int | None = None, height: int | None = None) -> dict:
         """Capture, optionally at an exact size.

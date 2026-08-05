@@ -173,6 +173,38 @@ def cmd_pause(args) -> int:
     return 0
 
 
+def cmd_screen(args) -> int:
+    """What GUI is open, or open the inventory / close what is open."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: screens are a client thing and RCON talks to a server")
+    with connect(args) as bridge:
+        reply = bridge.screen({"open": True, "close": False}.get(args.state))
+    for key in ("screen", "title", "width", "height"):
+        if key in reply:
+            print(f"{key}: {reply[key]}")
+    return 0
+
+
+def cmd_cursor(args) -> int:
+    """Move the pointer. Coordinates are GUI-scaled: see `screen` for the space they live in."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: the pointer is a client thing")
+    with connect(args) as bridge:
+        reply = bridge.cursor(args.x, args.y)
+    print(f"cursor {reply['x']},{reply['y']} (raw {reply['rawX']:.0f},{reply['rawY']:.0f})")
+    return 0
+
+
+def cmd_click(args) -> int:
+    """Press and release at a point. Non-zero if nothing took the click."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: clicking is a client thing")
+    with connect(args) as bridge:
+        reply = bridge.click(args.x, args.y, args.button)
+    print(f"click {'handled' if reply['handled'] else 'ignored'}")
+    return 0 if reply["handled"] else 1
+
+
 def cmd_log(args) -> int:
     """What the game has logged, so a silent failure stops being silent.
 
@@ -416,6 +448,22 @@ def main(argv: list[str] | None = None) -> int:
                       help="fail unless the game is running out of this directory. Two clients of "
                            "one Minecraft version are otherwise indistinguishable")
     ping.set_defaults(func=cmd_ping)
+
+    scr = subs.add_parser("screen", help="what GUI is open (devbridge only)")
+    scr.add_argument("state", nargs="?", choices=["open", "close"], default=None,
+                     help="open the inventory, or close whatever is open; omit to just report")
+    scr.set_defaults(func=cmd_screen)
+
+    cur = subs.add_parser("cursor", help="move the pointer, in GUI-scaled coordinates")
+    cur.add_argument("x", type=float)
+    cur.add_argument("y", type=float)
+    cur.set_defaults(func=cmd_cursor)
+
+    clk = subs.add_parser("click", help="press and release at a point")
+    clk.add_argument("x", type=float)
+    clk.add_argument("y", type=float)
+    clk.add_argument("--button", type=int, default=0, help="0 left, 1 right, 2 middle")
+    clk.set_defaults(func=cmd_click)
 
     log = subs.add_parser("log", help="what the game logged, since a marker")
     log.add_argument("--since", type=int, default=0, metavar="MARKER",
