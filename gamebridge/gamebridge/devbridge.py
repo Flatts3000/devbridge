@@ -121,7 +121,13 @@ class DevBridge:
         return self.request(verb="cursor", x=x, y=y)
 
     def click(self, x: float, y: float, button: int = 0) -> dict:
-        """Press and release at a point. Reply says whether anything took it."""
+        """Press and release at a point.
+
+        `onPress` and `onRelease` are what the screen returned for each half. Do not gate on them:
+        screens over-report (a creative inventory answers clicks on empty background) and
+        under-report (an FTB Quests tab switches chapters while returning false). `changedScreen`
+        is an observable consequence and a better signal; a screenshot is better still.
+        """
         return self.request(verb="click", x=x, y=y, button=button)
 
     def screenshot(self, name: str | None = None,

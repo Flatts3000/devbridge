@@ -238,8 +238,21 @@ def cmd_click(args) -> int:
         sys.exit("--devbridge required: clicking is a client thing")
     with connect(args) as bridge:
         reply = bridge.click(args.x, args.y, args.button)
-    emit(args, reply, f"click {'handled' if reply['handled'] else 'ignored'}")
-    return 0 if reply["handled"] else 1
+    # ALWAYS 0 when the request itself succeeded. Nothing this verb learns synchronously is a
+    # verdict: the booleans over-report (a creative inventory answers clicks on empty background)
+    # and under-report (an FTB Quests tab switches chapters returning false), and even a screen
+    # change lands late - clicking Respawn reported no change with the death screen still open, and
+    # the screen was gone a moment later. Exiting non-zero on that would fail scripts whose click
+    # worked. Check the consequence afterwards with `screen` or `shot`.
+    detail = []
+    if reply.get("onPress"):
+        detail.append("press")
+    if reply.get("onRelease"):
+        detail.append("release")
+    taken = ", ".join(detail) if detail else "nothing reported"
+    changed = f", screen -> {reply['screen'].split('.')[-1]}" if reply.get("changedScreen") else ""
+    emit(args, reply, f"click sent ({taken}{changed}); verify with screen or shot")
+    return 0
 
 
 def cmd_log(args) -> int:
