@@ -417,16 +417,42 @@ def cmd_launch(args) -> int:
 
 
 def cmd_probe(args) -> int:
-    """What is actually at a position.
+    """What is at a position, as far as a command can tell you.
 
-    This is the verb that makes the whole tool worth building. Placing a structure and looking at a
-    screenshot tells you it went somewhere; asking the server what block is at a coordinate tells you
-    whether it went where you meant.
+    **Commands cannot name an arbitrary block.** `data get block` reads block entity data and refuses
+    anything else - "The target block is not a block entity" - which is most blocks. Stone, dirt, ore,
+    logs. This verb shipped assuming otherwise, because it was written against a showcase scene of
+    chests and paintings and never pointed at terrain.
+
+    So there are two questions here and they take different routes. "What data does this block entity
+    hold" is `data get block`. "Is this block X" is `execute if block`, which tests a guess rather
+    than answering. Naming an unknown block needs a verb in the mod, which is unresolved (#13).
     """
     x, y, z = args.x, args.y, args.z
+
+    if args.is_block:
+        with connect(args) as rcon:
+            output = rcon.command(f"execute if block {x} {y} {z} {args.is_block}")
+        matches = output.startswith("Test passed")
+        emit(args, {"x": x, "y": y, "z": z, "is": args.is_block, "matches": matches,
+                    "output": output},
+             f"{'yes' if matches else 'no ':3} {x} {y} {z} is {args.is_block}")
+        return 0 if matches else 1
+
     with connect(args) as rcon:
         output = rcon.command(f"data get block {x} {y} {z}")
-    emit(args, {"x": x, "y": y, "z": z, "output": output}, output)
+
+    # Matching on the success phrase rather than the failure one: there are many ways to fail and
+    # exactly one shape of success. Still a string match against a localised message, which is the
+    # honest cost of there being no command that answers this properly.
+    has_data = "block data" in output
+    payload = {"x": x, "y": y, "z": z, "blockEntity": has_data, "output": output}
+    if has_data:
+        emit(args, payload, output)
+        return 0
+    hint = (f"probe: no command can name an arbitrary block. To test a guess: "
+            f"probe {x} {y} {z} --is minecraft:stone")
+    emit(args, payload, f"{output}{os.linesep}{hint}")
     return 0
 
 
@@ -586,9 +612,13 @@ def main(argv: list[str] | None = None) -> int:
                        help="how long --wait waits (default: 300s)")
     start.set_defaults(func=cmd_launch)
 
-    probe = subs.add_parser("probe", help="report the block at a position")
+    probe = subs.add_parser("probe",
+                            help="read block entity data at a position, or test what block it is")
     for axis in ("x", "y", "z"):
         probe.add_argument(axis, type=int)
+    probe.add_argument("--is", dest="is_block", default=None, metavar="BLOCK",
+                       help="test whether the block is this, e.g. minecraft:stone. Non-zero when "
+                            "it is not. Without this, only block entity data can be read")
     probe.set_defaults(func=cmd_probe)
 
     args = parser.parse_args(argv)
