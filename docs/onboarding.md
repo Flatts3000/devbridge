@@ -169,6 +169,22 @@ gamebridge --devbridge "$PORT" shot quest_tooltip
 Do not pass `--width/--height` to a GUI shot. Resizing re-lays-out the screen and changes the GUI
 scale, so the coordinates you just pointed at are no longer the same place.
 
+**Freeze the tick loop before a gallery shoot.** Two captures of the same scene differ while the
+world ticks - clouds drift, water and lava animate, particles move - and are byte-identical once it
+is frozen:
+
+```bash
+gamebridge --devbridge "$PORT" cmd "tick freeze"
+gamebridge --devbridge "$PORT" shot before
+gamebridge --devbridge "$PORT" --player @s cmd "function yourpack:showcase/hall"
+gamebridge --devbridge "$PORT" shot after
+gamebridge --devbridge "$PORT" cmd "tick unfreeze"
+```
+
+Measured: with lava filling the frame, two shots 1.2s apart hash differently while ticking and
+identically while frozen. That is what makes a screenshot an assertion rather than an illustration,
+and it needs no verb - `tick` is a vanilla command.
+
 **A gallery wants consistent dimensions.** `shot --width 1920 --height 1080` captures at exactly
 that size whatever the window is, by resizing it for the moment of the capture and putting it back.
 The window visibly changes shape while that happens, and it refuses on a fullscreen window rather

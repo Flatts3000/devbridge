@@ -158,7 +158,9 @@ by running exactly that sequence against the Trashlands pack: launch, `cmd` as `
 ## 8. Out of scope
 
 - **Anything a command can already do.** No bespoke verbs for teleporting or setting time; `cmd` covers
-  them and every one added is a thing to maintain.
+  them and every one added is a thing to maintain. A worked example: a `freeze` verb was proposed
+  (#15) to pin particles, clouds and animation for reproducible shots, and `cmd "tick freeze"` turns
+  out to make two captures byte-identical, animated textures included. Measured, then closed.
 - **Running in production.** Not a debug tool for shipped mods, not a server admin tool. RCON exists.
 - **Rendering without a window.** Minecraft needs a real GL context; there is no headless client. The
   window opens, it just does not need anybody looking at it.
