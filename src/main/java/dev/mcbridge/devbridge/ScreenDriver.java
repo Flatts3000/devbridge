@@ -114,8 +114,33 @@ final class ScreenDriver {
     /**
      * Press and release at a point.
      *
-     * <p>Both halves, because a screen that only ever sees a press leaves a widget stuck down, and
-     * the next thing to photograph it gets a button that looks pressed for no reason.
+     * <p>Both halves are sent, because a screen that only ever sees a press leaves a widget stuck
+     * down, and the next thing to photograph it gets a button that looks pressed for no reason.
+     *
+     * <p><b>And both halves are reported, which the first version did not do.</b> It returned
+     * {@code mouseClicked} alone and threw the release away, so a widget that acts on release did
+     * its work while the verb said the click was ignored. Vanilla's {@code AbstractWidget} answers
+     * the press, which is why buttons looked fine and an FTB Quests chapter tab did not: the same
+     * coordinate reported differently depending on what was under it, which reads exactly like a
+     * race and is not one.
+     *
+     * <p><b>Do not gate on the booleans alone.</b> They are what the screen chose to return, and
+     * screens are inconsistent about it in both directions. Measured on a creative inventory: a
+     * click on empty background reports {@code handled}, because that screen answers clicks
+     * anywhere for item dragging. Reported from the other side, an FTB Quests chapter tab switched
+     * chapters while reporting nothing took the click. A value that both over- and under-reports is
+     * not a gate.
+     *
+     * <p>The reply also carries the screen before and after, which is closer to an observable fact -
+     * but measured here it is still not a verdict, because <b>consequences are asynchronous</b>.
+     * Clicking Respawn on the death screen reported {@code changedScreen: false} with the death
+     * screen still open, and the screen was gone a fraction of a second later: the click sends a
+     * packet and the screen closes when the server answers.
+     *
+     * <p>So nothing this verb can return synchronously is a gate, and it does not pretend otherwise.
+     * It reports what it saw. A caller that needs to know whether the click worked asks afterwards -
+     * poll {@code screen}, or take a picture - which is the only thing that actually observes the
+     * consequence.
      */
     static JsonObject click(double x, double y, int button) throws Exception {
         return onClient(client -> {
@@ -123,16 +148,20 @@ final class ScreenDriver {
             if (screen == null) {
                 return Handlers.error("no screen is open, so there is nothing to click");
             }
+            String before = screen.getClass().getName();
             MouseButtonEvent event = new MouseButtonEvent(x, y, new MouseButtonInfo(button, 0));
             screen.mouseMoved(x, y);
-            boolean handled = screen.mouseClicked(event, false);
-            screen.mouseReleased(event);
+            boolean onPress = screen.mouseClicked(event, false);
+            boolean onRelease = screen.mouseReleased(event);
+            String after = client.screen == null ? null : client.screen.getClass().getName();
+
             JsonObject reply = Handlers.ok();
-            reply.addProperty("handled", handled);
-            // Whether anything took the click. A false here usually means the coordinates missed,
-            // and saying so beats a caller photographing an unchanged screen and wondering.
-            reply.addProperty("screen",
-                client.screen == null ? null : client.screen.getClass().getName());
+            reply.addProperty("onPress", onPress);
+            reply.addProperty("onRelease", onRelease);
+            reply.addProperty("handled", onPress || onRelease);
+            reply.addProperty("screenBefore", before);
+            reply.addProperty("screen", after);
+            reply.addProperty("changedScreen", !before.equals(after));
             return reply;
         });
     }
