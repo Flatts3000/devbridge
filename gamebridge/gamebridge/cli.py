@@ -33,6 +33,7 @@ import time
 from pathlib import Path
 
 from .devbridge import PROTOCOL_VERSION, DevBridge, DevBridgeError
+from . import sessions
 from .rcon import Rcon, RconError
 
 
@@ -255,6 +256,24 @@ def cmd_click(args) -> int:
     return 0
 
 
+def cmd_ps(args) -> int:
+    """What has been launched, and whether it is still there."""
+    found = sessions.all_sessions()
+    if not found:
+        emit(args, {"sessions": []}, "no sessions recorded")
+        return 0
+    rows = []
+    for session in found:
+        state = sessions.status(session)
+        rows.append({**session, "status": state})
+        if not getattr(args, "json", False):
+            print(f"  {session['port']:<6} {state:<8} pid {session['pid']:<8} "
+                  f"{session.get('world') or '-':<14} {session.get('instance')}")
+    if getattr(args, "json", False):
+        emit(args, {"sessions": rows})
+    return 0
+
+
 def cmd_log(args) -> int:
     """What the game has logged, so a silent failure stops being silent.
 
@@ -387,6 +406,9 @@ def cmd_launch(args) -> int:
 
     started = time.time()
     process = launch(command, instance)
+    # Recorded before anything can go wrong afterwards, so a caller that fails to connect in two
+    # minutes' time still learns what was started rather than getting a bare refusal.
+    sessions.record(args.port, process.pid, instance, args.world, instance / "logs" / "latest.log")
     started_info = {"pid": process.pid, "port": args.port}
     if not args.wait:
         emit(args, started_info, f"launched pid {process.pid} on port {args.port}")
@@ -581,6 +603,9 @@ def main(argv: list[str] | None = None) -> int:
     clk.add_argument("--button", type=int, default=0, help="0 left, 1 right, 2 middle")
     clk.set_defaults(func=cmd_click)
 
+    ps = subs.add_parser("ps", help="what has been launched, and whether it is still running")
+    ps.set_defaults(func=cmd_ps)
+
     log = subs.add_parser("log", help="what the game logged, since a marker")
     log.add_argument("--since", type=int, default=0, metavar="MARKER",
                      help="byte offset from a previous run of this command")
@@ -645,6 +670,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except OSError as exc:
         print(f"bridge: could not connect ({exc})", file=sys.stderr)
+        # The tool usually knows more than the socket does. Saying so is the difference between a
+        # diagnosis and a symptom, which is the whole point of recording a session.
+        if getattr(args, "devbridge", None):
+            explanation = sessions.explain_refusal(args.devbridge)
+            if explanation:
+                print(f"bridge: {explanation}", file=sys.stderr)
         return 1
 
 
