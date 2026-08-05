@@ -88,6 +88,15 @@ final class ClientHandlers {
         return ScreenDriver.click(x, y, button);
     }
 
+    static JsonObject look(MinecraftServer server) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a server has no camera and no crosshair. "
+                + "Position, rotation, velocity and on-ground are reachable from either side with "
+                + "cmd and 'data get entity <player>'");
+        }
+        return Sightline.look();
+    }
+
     static JsonObject pause(MinecraftServer server, boolean enabled) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: a dedicated server has no window to "

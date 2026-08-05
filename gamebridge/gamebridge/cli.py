@@ -263,6 +263,44 @@ def print_widgets(reply: dict) -> None:
               f"{state:<8}  {'  ' * w.get('depth', 0)}{label}")
 
 
+def cmd_look(args) -> int:
+    """Where the camera is and what the crosshair is on."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: a server has no camera. For position, rotation, velocity "
+                 "and on-ground, use: cmd \"data get entity <player>\"")
+    with connect(args) as bridge:
+        reply = bridge.look()
+    if getattr(args, "json", False):
+        emit(args, reply)
+        return 0
+
+    camera = reply.get("camera")
+    if camera is None:
+        print("camera: not initialised yet (no frame has been drawn)")
+    else:
+        x, y, z = camera["pos"]
+        print(f"camera: {x} {y} {z}  yaw {camera['yaw']} pitch {camera['pitch']} "
+              f"fov {camera['fov']}" + (" (detached)" if camera["detached"] else ""))
+
+    hit = reply.get("hit")
+    if hit is None:
+        print("hit: nothing picked yet")
+        return 0
+    # Absent only if the camera was uninitialised, which the reply reported above rather than
+    # guessing at. Saying "at None blocks" would read as a bug in the distance.
+    away = f" at {hit['distance']} blocks" if "distance" in hit else ""
+    if hit["type"] == "block":
+        px, py, pz = hit["pos"]
+        print(f"hit: block {px} {py} {pz} face {hit['face']}{away}")
+        if "block" in hit:
+            print(f"     {hit['block']}")
+    elif hit["type"] == "entity":
+        print(f"hit: entity {hit['entity']} {hit['name']!r}{away}")
+    else:
+        print(f"hit: nothing in reach (ray ended{away or ' at its limit'})")
+    return 0
+
+
 def cmd_cursor(args) -> int:
     """Move the pointer. Coordinates are GUI-scaled: see `screen` for the space they live in."""
     if args.devbridge is None:
@@ -680,6 +718,10 @@ def main(argv: list[str] | None = None) -> int:
     scr.add_argument("state", nargs="?", choices=["open", "close"], default=None,
                      help="open the inventory, or close whatever is open; omit to just report")
     scr.set_defaults(func=cmd_screen)
+
+    lk = subs.add_parser("look", help="where the camera is and what the crosshair is on "
+                                      "(devbridge only)")
+    lk.set_defaults(func=cmd_look)
 
     cur = subs.add_parser("cursor", help="move the pointer, in GUI-scaled coordinates")
     cur.add_argument("x", type=float)

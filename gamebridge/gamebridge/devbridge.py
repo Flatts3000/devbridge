@@ -123,6 +123,19 @@ class DevBridge:
         """
         return self.request(verb="screen", **({} if open is None else {"open": open}))
 
+    def look(self) -> dict:
+        """Where the camera is, and what the crosshair is on.
+
+        Only what a command cannot answer. Position, rotation, velocity and on-ground all come back
+        from `cmd("data get entity @s ...")`, including real `Motion` for a player, so they are not
+        here. The camera is not the player in third person or spectator, and there is no vanilla
+        raycast at all.
+
+        `hit` is null when the game has not picked anything yet, and a `type` of `miss` when the ray
+        reached its limit through open air. Those are different answers and are not collapsed.
+        """
+        return self.request(verb="look")
+
     def cursor(self, x: float, y: float) -> dict:
         """Move the pointer. This is what makes a tooltip render."""
         return self.request(verb="cursor", x=x, y=y)

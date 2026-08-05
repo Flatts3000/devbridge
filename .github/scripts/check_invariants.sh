@@ -98,7 +98,7 @@ fi
 #
 # Adding a client-only class means adding it here, on purpose.
 # ---------------------------------------------------------------------------
-client_only="ScreenshotTaker.java ClientOptions.java InputLock.java ScreenDriver.java"
+client_only="ScreenshotTaker.java ClientOptions.java InputLock.java ScreenDriver.java Sightline.java"
 for f in $(find "$src" -name '*.java'); do
     case " $client_only " in
         *" $(basename "$f") "*) continue ;;

@@ -85,6 +85,7 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `screen` | client render thread | Reports the open GUI, its title, its GUI-scaled size, and the widgets in it - each with its label, bounds and a click point in that same space. Opens the inventory or closes anything |
 | `cursor` | client render thread | Moves the pointer, which is what renders a tooltip. Moves the real OS cursor, not just the screen's idea of it |
 | `click` | client render thread | Press and release at a point. Reports what it saw, none of which is a verdict: screens over- and under-report, and consequences land asynchronously. Verify with `screen` or a picture |
+| `look` | client render thread | Where the camera is - which is not the player in third person or spectator - and what the crosshair is on, as a block with its full state or an entity. Reports nothing a command already answers: position, rotation, velocity and on-ground all come back from `data get entity` |
 | `stop` | either | Halts the world, and on a client quits the game. Quitting matters: a client left at the title screen keeps the world's file locks, and the next launch fails looking like a corrupt save |
 
 ## 4. The two threading traps
