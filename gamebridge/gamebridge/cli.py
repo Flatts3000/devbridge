@@ -24,6 +24,7 @@ Full guide: https://github.com/Flatts3000/devbridge/blob/main/docs/onboarding.md
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shlex
 import subprocess
@@ -33,6 +34,19 @@ from pathlib import Path
 
 from .devbridge import PROTOCOL_VERSION, DevBridge, DevBridgeError
 from .rcon import Rcon, RconError
+
+
+def emit(args, payload: dict, human: str | None = None) -> None:
+    """One line of output, in whichever shape the caller asked for.
+
+    Every command routes through here so `--json` means the same thing everywhere rather than being
+    a per-command afterthought. The human line stays the default because a person running this by
+    hand should not have to read JSON to find out a screenshot landed.
+    """
+    if getattr(args, "json", False):
+        print(json.dumps(payload))
+    elif human is not None:
+        print(human)
 
 
 def _version() -> str:
@@ -111,7 +125,7 @@ def cmd_wait(args) -> int:
         try:
             with connect(args) as rcon:
                 rcon.command("list")
-            print("server is up")
+            emit(args, {"up": True}, "server is up")
             return 0
         except (OSError, RconError, SystemExit) as exc:
             last = exc if not isinstance(exc, SystemExit) else last
@@ -124,8 +138,7 @@ def cmd_run(args) -> int:
     with connect(args) as rcon:
         output = (rcon.command(args.command, args.player)
                   if args.player and hasattr(rcon, "hud") else rcon.command(args.command))
-    if output:
-        print(output)
+    emit(args, {"output": output}, output or None)
     return 0
 
 
@@ -134,6 +147,9 @@ def cmd_script(args) -> int:
     with connect(args) as rcon:
         pairs = (rcon.script(lines, args.player)
                  if args.player and hasattr(rcon, "hud") else rcon.script(lines))
+    if getattr(args, "json", False):
+        emit(args, {"ran": [{"command": c, "output": o} for c, o in pairs]})
+    else:
         for command, output in pairs:
             print(f"> {command}")
             if output:
@@ -148,7 +164,7 @@ def cmd_shot(args) -> int:
         sys.exit("screenshots need --devbridge: RCON talks to a server, and a server has no client")
     with connect(args) as bridge:
         reply = bridge.screenshot(args.name, args.width, args.height)
-    print(reply.get("path") or reply.get("message", "screenshot taken"))
+    emit(args, reply, reply.get("path") or reply.get("message", "screenshot taken"))
     return 0
 
 
@@ -157,8 +173,8 @@ def cmd_hud(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: the HUD is a client thing and RCON talks to a server")
     with connect(args) as bridge:
-        bridge.hud(args.state == "on")
-    print(f"hud {args.state}")
+        reply = bridge.hud(args.state == "on")
+    emit(args, reply, f"hud {args.state}")
     return 0
 
 
@@ -171,8 +187,8 @@ def cmd_input(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: the mouse is a client thing and RCON talks to a server")
     with connect(args) as bridge:
-        bridge.input(args.state == "on")
-    print(f"input {args.state}")
+        reply = bridge.input(args.state == "on")
+    emit(args, reply, f"input {args.state}")
     return 0
 
 
@@ -185,8 +201,8 @@ def cmd_pause(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: pausing is a client thing and RCON talks to a server")
     with connect(args) as bridge:
-        bridge.pause(args.state == "on")
-    print(f"pause-on-lost-focus {args.state}")
+        reply = bridge.pause(args.state == "on")
+    emit(args, reply, f"pause-on-lost-focus {args.state}")
     return 0
 
 
@@ -196,9 +212,12 @@ def cmd_screen(args) -> int:
         sys.exit("--devbridge required: screens are a client thing and RCON talks to a server")
     with connect(args) as bridge:
         reply = bridge.screen({"open": True, "close": False}.get(args.state))
-    for key in ("screen", "title", "width", "height"):
-        if key in reply:
-            print(f"{key}: {reply[key]}")
+    if getattr(args, "json", False):
+        emit(args, reply)
+    else:
+        for key in ("screen", "title", "width", "height"):
+            if key in reply:
+                print(f"{key}: {reply[key]}")
     return 0
 
 
@@ -208,7 +227,8 @@ def cmd_cursor(args) -> int:
         sys.exit("--devbridge required: the pointer is a client thing")
     with connect(args) as bridge:
         reply = bridge.cursor(args.x, args.y)
-    print(f"cursor {reply['x']},{reply['y']} (raw {reply['rawX']:.0f},{reply['rawY']:.0f})")
+    emit(args, reply,
+         f"cursor {reply['x']},{reply['y']} (raw {reply['rawX']:.0f},{reply['rawY']:.0f})")
     return 0
 
 
@@ -218,7 +238,7 @@ def cmd_click(args) -> int:
         sys.exit("--devbridge required: clicking is a client thing")
     with connect(args) as bridge:
         reply = bridge.click(args.x, args.y, args.button)
-    print(f"click {'handled' if reply['handled'] else 'ignored'}")
+    emit(args, reply, f"click {'handled' if reply['handled'] else 'ignored'}")
     return 0 if reply["handled"] else 1
 
 
@@ -244,12 +264,17 @@ def cmd_log(args) -> int:
     except LogError as exc:
         sys.exit(f"log: {exc}")
 
-    for line in result["lines"]:
-        print(line)
-    # The marker goes to stderr so `gamebridge log > errors.txt` keeps the log clean and the cursor
-    # still reaches a human.
-    print(f"log: marker {result['marker']}, {result['errors']} error(s), "
-          f"{result['warnings']} warning(s)", file=sys.stderr)
+    if getattr(args, "json", False):
+        # No stderr summary here: the marker and the counts are in the payload, and printing them
+        # twice in two formats is how a caller ends up parsing the wrong one.
+        emit(args, result)
+    else:
+        for line in result["lines"]:
+            print(line)
+        # The marker goes to stderr so `gamebridge log > errors.txt` keeps the log clean and the
+        # cursor still reaches a human.
+        print(f"log: marker {result['marker']}, {result['errors']} error(s), "
+              f"{result['warnings']} warning(s)", file=sys.stderr)
     return 1 if (args.fail_on_error and result["errors"]) else 0
 
 
@@ -263,8 +288,8 @@ def cmd_stop(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: for a dedicated server, `cmd stop` is the console command")
     with connect(args) as bridge:
-        bridge.stop()
-    print("stopping")
+        reply = bridge.stop()
+    emit(args, reply, "stopping")
     return 0
 
 
@@ -278,10 +303,13 @@ def cmd_ping(args) -> int:
         sys.exit("--devbridge required: ping is a devbridge verb; use `wait` for RCON")
     with connect(args) as bridge:
         reply = bridge.ping(expect_instance=args.expect_instance)
-    for key in ("protocol", "side", "mcVersion", "hasClient", "worldName", "mods",
-                "gameDir", "pauseOnLostFocus", "inputLocked"):
-        if key in reply:
-            print(f"{key}: {reply[key]}")
+    if getattr(args, "json", False):
+        emit(args, reply)
+    else:
+        for key in ("protocol", "side", "mcVersion", "hasClient", "worldName", "mods",
+                    "gameDir", "pauseOnLostFocus", "inputLocked"):
+            if key in reply:
+                print(f"{key}: {reply[key]}")
     return 0
 
 
@@ -317,11 +345,11 @@ def cmd_launch(args) -> int:
         #
         # Quoted the way the platform would, so a world name with a space in it reads as one
         # argument. The real launch passes a list and never goes near a shell.
-        if os.name == "nt":
-            print(subprocess.list2cmdline(command))
-        else:
-            print(shlex.join(command))
-        for problem in verify(command):
+        rendered = (subprocess.list2cmdline(command) if os.name == "nt"
+                    else shlex.join(command))
+        problems = verify(command)
+        emit(args, {"command": command, "rendered": rendered, "problems": problems}, rendered)
+        for problem in problems:
             print(f"launch: {problem}", file=sys.stderr)
         return 0
 
@@ -333,16 +361,22 @@ def cmd_launch(args) -> int:
 
     started = time.time()
     process = launch(command, instance)
-    print(f"launched pid {process.pid} on port {args.port}")
-
+    started_info = {"pid": process.pid, "port": args.port}
     if not args.wait:
+        emit(args, started_info, f"launched pid {process.pid} on port {args.port}")
         return 0
+    # Under --json the launch line is held back and folded into the single object emitted below.
+    # Two documents on one stdout is not JSON, and a caller doing json.load() gets a parse error
+    # from the second one rather than the answer it asked for.
+    if not getattr(args, "json", False):
+        print(f"launched pid {process.pid} on port {args.port}")
 
     # Poll the socket rather than the process: a live pid means java started, not that the mod is
     # listening, and the gap between them is most of a minute.
     deadline = time.monotonic() + args.for_seconds
     while time.monotonic() < deadline:
         if process.poll() is not None:
+            emit(args, {**started_info, "up": False, "exitCode": process.returncode})
             print(f"launch: the game exited with code {process.returncode} before answering",
                   file=sys.stderr)
             # The tool already knows why. Making the caller go and find the crash report is the
@@ -359,10 +393,12 @@ def cmd_launch(args) -> int:
         try:
             with DevBridge(port=args.port, timeout=5.0) as bridge:
                 reply = bridge.ping()
-            print(f"up: {reply.get('side')}, protocol {reply.get('protocol')}")
+            emit(args, {**started_info, "up": True, **reply},
+                 f"up: {reply.get('side')}, protocol {reply.get('protocol')}")
             return 0
         except (OSError, DevBridgeError):
             time.sleep(3.0)
+    emit(args, {**started_info, "up": False, "timedOut": True})
     print(f"launch: no answer on {args.port} within {args.for_seconds:g}s", file=sys.stderr)
     return 1
 
@@ -376,7 +412,8 @@ def cmd_probe(args) -> int:
     """
     x, y, z = args.x, args.y, args.z
     with connect(args) as rcon:
-        print(rcon.command(f"data get block {x} {y} {z}"))
+        output = rcon.command(f"data get block {x} {y} {z}")
+    emit(args, {"x": x, "y": y, "z": z, "output": output}, output)
     return 0
 
 
@@ -399,7 +436,9 @@ def cmd_check(args) -> int:
 
     label = "ok  " if passed else "FAIL"
     expected = "" if args.count is None else f" (wanted {args.count}, got {count})"
-    print(f"{label} {args.condition}{expected}")
+    emit(args, {"condition": args.condition, "passed": passed, "count": count,
+                "expected": args.count, "output": output},
+         f"{label} {args.condition}{expected}")
     return 0 if passed else 1
 
 
@@ -411,6 +450,9 @@ def main(argv: list[str] | None = None) -> int:
     # not the package version, is what has to match the mod.
     parser.add_argument("--version", action="version",
                         version=f"gamebridge {_version()} (wire protocol {PROTOCOL_VERSION})")
+    parser.add_argument("--json", action="store_true",
+                        help="print the reply object instead of a sentence. Sentences get reworded; "
+                             "this is the surface to script against")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--password", default=None)
