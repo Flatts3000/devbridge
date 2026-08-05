@@ -198,6 +198,7 @@ def build_command(
     install_root: Path | None = None,
     memory_mb: int | None = None,
     java: Path | None = None,
+    properties: list[str] | None = None,
 ) -> list[str]:
     instance = Path(instance)
     root = Path(install_root) if install_root else find_install_root(instance)
@@ -248,6 +249,12 @@ def build_command(
     # The whole point. Set before the main class, because it is a JVM property and not a game
     # argument: devbridge reads it with System.getProperty at mod construction.
     command.append(f"-Ddevbridge.port={port}")
+
+    # Anything else the caller wants set. Without this a pack has no way to reach devbridge's
+    # behaviour switches at all: a mod repo puts them in a Gradle run block, and a pack has no
+    # Gradle, which is the whole reason this command exists.
+    for entry in properties or []:
+        command.append(entry if entry.startswith("-D") else f"-D{entry}")
 
     command.append(version["mainClass"])
     command += _arguments(version, "game", context, features)

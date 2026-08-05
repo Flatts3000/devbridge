@@ -224,6 +224,7 @@ def cmd_launch(args) -> int:
             install_root=Path(args.install_root) if args.install_root else None,
             memory_mb=args.memory,
             java=Path(args.java) if args.java else None,
+            properties=args.property,
         )
     except LaunchError as exc:
         sys.exit(f"launch: {exc}")
@@ -384,6 +385,9 @@ def main(argv: list[str] | None = None) -> int:
     start.add_argument("--memory", type=int, default=None, metavar="MB",
                        help="override the instance's allocated memory")
     start.add_argument("--java", default=None, help="override the bundled JRE")
+    start.add_argument("-D", "--property", action="append", default=[], metavar="K=V",
+                       help="extra JVM system property, repeatable. A pack has no Gradle run "
+                            "block, so this is how it reaches devbridge.lockInput and friends")
     start.add_argument("--install-root", default=None,
                        help="the CurseForge Install directory, if it is not beside the instance")
     start.add_argument("--dry-run", action="store_true",

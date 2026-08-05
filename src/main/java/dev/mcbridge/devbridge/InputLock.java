@@ -30,9 +30,12 @@ import net.neoforged.neoforge.common.NeoForge;
  *       tick listener releases it again. One tick of a screen close is the only window left.
  * </ul>
  *
- * <p>Automatic on world load, because the accident it prevents is the default state of working this
- * way. Send {@code {"verb":"input"}} to hand the mouse back when you want to fly around and frame
- * something by hand.
+ * <p><b>Off by default.</b> Ask for it with {@code -Ddevbridge.lockInput=true} for a whole run, or
+ * {@code {"verb":"input","enabled":false}} for as long as you need it. The lock is worth having
+ * around an automated shoot and surprising anywhere else: a run that wants the camera held still
+ * knows it and can say so, while a person who opened the game to frame something by eye has no idea
+ * a mod took their mouse, and a camera that will not turn reads as a broken game rather than a
+ * setting.
  */
 final class InputLock {
 
@@ -56,8 +59,8 @@ final class InputLock {
         if (!locked) {
             DevBridge.LOGGER.info(
                 "devbridge locked mouse input, so alt-tabbing into the window cannot turn the "
-                    + "camera. Send {\"verb\":\"input\"} to hand it back, or start with -D{}=false "
-                    + "to never take it.", DevBridge.LOCK_INPUT_PROPERTY);
+                    + "camera. You asked for this with -D{}=true; send {\"verb\":\"input\"} to hand "
+                    + "the mouse back.", DevBridge.LOCK_INPUT_PROPERTY);
         }
         apply(true);
     }

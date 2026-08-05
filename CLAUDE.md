@@ -71,8 +71,9 @@ published to any Maven repository, deliberately.
   `new ServerSocket(port)`, which binds every interface and publishes an arbitrary-command endpoint to
   the network. Not exposed as an option.
 - **Off unless asked.** No `-Ddevbridge.port` means no socket and no handlers. The two behaviour
-  properties (`devbridge.keepTicking`, `devbridge.lockInput`) default to on, which is fine because
-  they only ever apply inside that gate: they are ergonomics, not the boundary.
+  properties (`devbridge.keepTicking`, on; `devbridge.lockInput`, off) only ever apply inside that
+  gate, which is why they can have defaults at all: they are ergonomics, not the boundary. The
+  defaults differ on purpose, by which case can ask for what it wants - see the `flag` javadoc.
 - **Never ship it.** Separate jar, not a dependency of anything released.
 
 ## Architecture
@@ -145,10 +146,12 @@ the remaining open work (forcing a screenshot resolution).
 - **A toggle verb with no field restores vanilla.** `hud` shows, `input` gives the mouse back,
   `pause` restores pausing on lost focus. `false` gets the devbridge behaviour. Keep new toggles on
   that rule; an exception costs more than the verb is worth.
-- **The pause and the mouse lock are one decision, not two.** Turning off pause-on-lost-focus is
-  what makes an unfocused client answer at all, and it is also what lets a stray alt-tab turn the
-  camera, because the pause screen was the thing that used to catch that. Removing `InputLock`
-  without putting the pause back leaves the hazard with nothing covering it.
+- **The pause and the mouse lock are one hazard, covered separately.** Turning off
+  pause-on-lost-focus is what makes an unfocused client answer at all, and it is also what lets a
+  stray alt-tab turn the camera, because the pause screen was the thing that used to catch that.
+  The lock exists for that hazard, and since it is off by default the hazard is uncovered unless
+  somebody asks. That is deliberate, but it means an unattended screenshot loop should be turning
+  the lock on, and anything that removes `InputLock` entirely leaves those loops nothing to ask for.
 - **The lock is an ungrabbed mouse, nothing more.** `MouseHandler.turnPlayer` runs only while the
   mouse is grabbed. Two things re-grab it: a world click, cancelled through
   `InputEvent.MouseButton.Pre` (which `ClientHooks.onMouseButtonPre` fires *before* `grabMouse`),
