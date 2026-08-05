@@ -157,6 +157,12 @@ class DevBridge:
         Naming a size resizes the window for the moment of the capture and puts it back, because the
         scene has to be drawn at that size: there is no way to render the level into an offscreen
         target on demand. The window visibly changes shape while it happens.
+
+        With a GUI open, that resize lays the screen out again and can change the GUI scale with it,
+        so the reply adds `guiRelayout` and both layouts (`screenBefore`, `screenAtCapture`).
+        Coordinates measured off such an image do not apply to the live screen, and the two layouts
+        are not related by a scale - widgets move relative to each other. Ask `screen` for widget
+        bounds instead; those are always in the live layout.
         """
         payload: dict = {"verb": "screenshot"}
         if name:

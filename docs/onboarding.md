@@ -211,7 +211,10 @@ than the old silence. `LIST TRUNCATED` means the depth or size cap cut the walk 
 button may be there after all.
 
 Do not pass `--width/--height` to a GUI shot. Resizing re-lays-out the screen and changes the GUI
-scale, so the coordinates you just pointed at are no longer the same place.
+scale, so the coordinates you just pointed at are no longer the same place. The tool no longer only
+warns in prose: a sized shot with a GUI open reports `guiRelayout` with the layout before and during
+the capture, and the CLI prints a warning on stderr naming both. A 480x270 screen captured at
+1024x768 came back 342x256.
 
 **Freeze the tick loop before a gallery shoot.** Two captures of the same scene differ while the
 world ticks - clouds drift, water and lava animate, particles move - and are byte-identical once it

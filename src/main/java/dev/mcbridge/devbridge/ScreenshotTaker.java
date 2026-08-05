@@ -71,8 +71,12 @@ final class ScreenshotTaker {
 
         int previousWidth = window.getWidth();
         int previousHeight = window.getHeight();
+        CompletableFuture<int[]> before = new CompletableFuture<>();
         CompletableFuture<Void> resized = new CompletableFuture<>();
         client.execute(() -> {
+            // Read the layout before asking for the resize, in the same task, so nothing can lay the
+            // screen out again between the two.
+            before.complete(layout(client));
             window.setWindowed(width, height);
             resized.complete(null);
         });
@@ -80,7 +84,13 @@ final class ScreenshotTaker {
 
         try {
             awaitTarget(client, width, height);
-            return take(name);
+            CompletableFuture<int[]> during = new CompletableFuture<>();
+            client.execute(() -> during.complete(layout(client)));
+            int[] captured = during.get(10, TimeUnit.SECONDS);
+
+            JsonObject reply = take(name);
+            reportRelayout(reply, before.get(10, TimeUnit.SECONDS), captured);
+            return reply;
         } finally {
             CompletableFuture<Void> restored = new CompletableFuture<>();
             client.execute(() -> {
@@ -89,6 +99,55 @@ final class ScreenshotTaker {
             });
             restored.get(10, TimeUnit.SECONDS);
         }
+    }
+
+    /**
+     * The open screen's GUI-scaled size, or a marker that nothing is open. Render thread only.
+     *
+     * <p>An int array rather than an object because it crosses a future twice and one of the two
+     * readings is taken in the middle of the task that starts the resize.
+     */
+    private static int[] layout(Minecraft client) {
+        net.minecraft.client.gui.screens.Screen screen = client.screen;
+        return screen == null
+            ? new int[] {0, 0, 0}
+            : new int[] {1, screen.width, screen.height};
+    }
+
+    /**
+     * Say so when the resize moved the GUI, and say what it moved to.
+     *
+     * <p><b>Resizing for a capture silently changes the answer for a GUI shot.</b> The window is a
+     * different shape for the moment of the capture, so the screen is laid out again and the GUI
+     * scale can change with it. Measured: a screen reporting 480x270 inside a 1920x1080 window,
+     * captured at 1024x768, put the slot under the cursor somewhere else - and coordinates read off
+     * that image pointed at the wrong place when fed back, because they were measured in a layout
+     * that existed only during the capture. The world-shot path, which is the common one, is
+     * unaffected: there is no layout to move.
+     *
+     * <p>So the reply carries both layouts. Not so they can be converted between - a screen
+     * re-laying-out is not a scale, widgets move relative to each other - but so a caller measuring
+     * off the image can see that the thing it measured is not the thing that is on screen now. The
+     * answer to "where do I click" is {@code screen}'s widget bounds, which are reported in the live
+     * layout and need no measuring at all.
+     *
+     * <p>Nothing is added when no screen was open, because a flag that is always present on the
+     * common path is noise rather than a warning.
+     */
+    private static void reportRelayout(JsonObject reply, int[] before, int[] during) {
+        if (before[0] == 0 && during[0] == 0) {
+            return;
+        }
+        boolean moved = before[1] != during[1] || before[2] != during[2];
+        reply.addProperty("guiRelayout", moved);
+        JsonObject was = new JsonObject();
+        was.addProperty("width", before[1]);
+        was.addProperty("height", before[2]);
+        reply.add("screenBefore", was);
+        JsonObject now = new JsonObject();
+        now.addProperty("width", during[1]);
+        now.addProperty("height", during[2]);
+        reply.add("screenAtCapture", now);
     }
 
     /** Block until the main render target actually reports the size we asked for. */
