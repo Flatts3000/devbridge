@@ -211,7 +211,7 @@ def cmd_launch(args) -> int:
     The last manual step in the loop. Everything after this already worked; starting the game was
     the part that needed a person.
     """
-    from .launch import LaunchError, build_command, launch, verify
+    from .launch import LaunchError, build_command, explain_exit, launch, verify
 
     instance = Path(args.instance)
     try:
@@ -251,6 +251,7 @@ def cmd_launch(args) -> int:
             print(f"launch: {problem}", file=sys.stderr)
         sys.exit("launch: refusing to start with a classpath that does not resolve")
 
+    started = time.time()
     process = launch(command, instance)
     print(f"launched pid {process.pid} on port {args.port}")
 
@@ -262,7 +263,19 @@ def cmd_launch(args) -> int:
     deadline = time.monotonic() + args.for_seconds
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            sys.exit(f"launch: the game exited with code {process.returncode} before answering")
+            print(f"launch: the game exited with code {process.returncode} before answering",
+                  file=sys.stderr)
+            # The tool already knows why. Making the caller go and find the crash report is the
+            # difference between a diagnosis and a symptom.
+            explanation = explain_exit(instance, started)
+            for line in explanation:
+                print(f"launch: {line}", file=sys.stderr)
+            if not explanation:
+                # A JVM that never reached Minecraft writes neither a crash report nor a log, so
+                # saying "nothing on disk" beats one bare exit code that looks like the whole answer.
+                print("launch: no crash report or fresh log, so the game died before Minecraft "
+                      "started. The java process's own output says why.", file=sys.stderr)
+            return 1
         try:
             with DevBridge(port=args.port, timeout=5.0) as bridge:
                 reply = bridge.ping()

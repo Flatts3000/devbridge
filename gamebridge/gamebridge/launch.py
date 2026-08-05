@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import uuid
@@ -29,6 +30,11 @@ from pathlib import Path
 
 class LaunchError(RuntimeError):
     pass
+
+
+#: A qualified throwable at the head of a stack trace: `java.lang.NoClassDefFoundError: ...`,
+#: `joptsimple.MultipleArgumentsForOptionException: ...`.
+_THROWABLE = re.compile(r"^[a-z][\w.]*\.[A-Z]\w*(Exception|Error)\b")
 
 
 # ------------------------------------------------------------------ locating things
@@ -350,6 +356,44 @@ def verify(command: list[str]) -> list[str]:
                 if entry and not Path(entry).is_file():
                     problems.append(f"missing classpath entry: {entry}")
     return problems
+
+
+def explain_exit(instance: Path, since: float) -> list[str]:
+    """Why the game died, from what it left behind.
+
+    A launch that fails currently looks identical to a slow one until the timeout expires, and the
+    caller is left to go and read `crash-reports/` by hand. That is not hypothetical: the first real
+    launch this tool ever did crashed on a duplicated argument, and finding out meant opening the
+    directory.
+
+    Only files written since the launch count. A crash report from last week is worse than silence,
+    because it is a confident answer to the wrong question.
+    """
+    lines: list[str] = []
+
+    reports = [p for p in (instance / "crash-reports").glob("crash-*.txt")
+               if p.stat().st_mtime >= since]
+    if reports:
+        newest = max(reports, key=lambda p: p.stat().st_mtime)
+        lines.append(str(newest))
+        for line in newest.read_text(encoding="utf-8", errors="replace").splitlines()[:12]:
+            # Vanilla's own summary, and the throwable under it. Matching on "Exception" alone
+            # misses every Error, and Errors are the interesting ones: NoClassDefFoundError,
+            # OutOfMemoryError, StackOverflowError. Match the shape of a qualified throwable name
+            # instead of one of its two spellings.
+            stripped = line.strip()
+            if stripped.startswith("Description:") or _THROWABLE.match(stripped):
+                lines.append(stripped)
+
+    if not lines:
+        # Not every death writes a crash report. A fatal line in the log is the next best thing.
+        log = instance / "logs" / "latest.log"
+        if log.is_file() and log.stat().st_mtime >= since:
+            tail = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+            fatal = [t for t in tail if "/FATAL]" in t or "Error occurred" in t]
+            lines.extend(fatal[-3:] or tail[-2:])
+
+    return lines
 
 
 def launch(command: list[str], instance: Path) -> subprocess.Popen:
