@@ -173,6 +173,17 @@ def cmd_pause(args) -> int:
     return 0
 
 
+def cmd_settle(args) -> int:
+    """Wait until the client has drawn what was just placed, instead of sleeping and hoping."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: frames are a client thing and RCON talks to a server")
+    with connect(args) as bridge:
+        reply = bridge.settle(args.timeout_ms, args.frames)
+    print(f"settled in {reply['waitedMs']}ms over {reply['quietFrames']} quiet frames "
+          f"(queue {reply['queue']})")
+    return 0 if reply.get("settled") else 1
+
+
 def cmd_stop(args) -> int:
     """Close the world and quit the game.
 
@@ -364,6 +375,12 @@ def main(argv: list[str] | None = None) -> int:
 
     ping = subs.add_parser("ping", help="handshake and protocol check (devbridge only)")
     ping.set_defaults(func=cmd_ping)
+
+    wait_draw = subs.add_parser("settle", help="wait until the client has drawn what was placed")
+    wait_draw.add_argument("--timeout-ms", type=int, default=10_000)
+    wait_draw.add_argument("--frames", type=int, default=3,
+                           help="consecutive quiet frames required (default: 3)")
+    wait_draw.set_defaults(func=cmd_settle)
 
     halt = subs.add_parser("stop", help="close the world and quit the game (devbridge only)")
     halt.set_defaults(func=cmd_stop)

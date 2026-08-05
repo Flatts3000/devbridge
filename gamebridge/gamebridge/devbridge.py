@@ -106,6 +106,16 @@ class DevBridge:
         """
         return self.request(verb="pause", enabled=enabled)
 
+    def settle(self, timeout_ms: int = 10_000, frames: int = 3) -> dict:
+        """Block until the client has finished drawing what a command just placed.
+
+        Call this between placing a scene and shooting it, in place of a sleep. The reply carries
+        how long it actually waited, and whether it could see the chunk queue at all: a client
+        running Sodium or a similar renderer replacement reports `queue: unavailable`, and the wait
+        degrades to frames only rather than pretending.
+        """
+        return self.request(verb="settle", timeoutMs=timeout_ms, frames=frames)
+
     def screenshot(self, name: str | None = None) -> dict:
         return self.request(verb="screenshot", **({"name": name} if name else {}))
 

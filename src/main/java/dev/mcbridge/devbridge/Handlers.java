@@ -57,6 +57,9 @@ final class Handlers {
                 !request.has("enabled") || request.get("enabled").getAsBoolean());
             case "pause" -> ClientHandlers.pause(server,
                 !request.has("enabled") || request.get("enabled").getAsBoolean());
+            case "settle" -> ClientHandlers.settle(server,
+                request.has("timeoutMs") ? request.get("timeoutMs").getAsLong() : 10_000L,
+                request.has("frames") ? request.get("frames").getAsInt() : 3);
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a
             // tool whose entire job is reporting what happened.

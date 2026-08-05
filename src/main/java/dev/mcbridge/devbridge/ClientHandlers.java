@@ -48,6 +48,14 @@ final class ClientHandlers {
         return InputLock.set(enabled);
     }
 
+    static JsonObject settle(MinecraftServer server, long timeoutMs, int quietFrames)
+            throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: there are no frames to wait for");
+        }
+        return Settle.settle(timeoutMs, quietFrames);
+    }
+
     static JsonObject pause(MinecraftServer server, boolean enabled) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: a dedicated server has no window to "
