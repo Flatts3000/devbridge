@@ -82,6 +82,7 @@ final class ClientHandlers {
         if (available(server)) {
             reply.addProperty("pauseOnLostFocus", ClientOptions.pausesOnLostFocus());
             reply.addProperty("inputLocked", InputLock.isLocked());
+            reply.addProperty("gameDir", ClientOptions.gameDirectory());
         }
     }
 }

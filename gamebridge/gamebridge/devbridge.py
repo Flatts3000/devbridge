@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import socket
+from pathlib import Path
 
 
 class DevBridgeError(RuntimeError):
@@ -109,13 +110,39 @@ class DevBridge:
     def screenshot(self, name: str | None = None) -> dict:
         return self.request(verb="screenshot", **({"name": name} if name else {}))
 
-    def ping(self, check_protocol: bool = True) -> dict:
-        """Handshake, and by default the version check.
+    def ping(self, check_protocol: bool = True, expect_instance: str | None = None) -> dict:
+        """Handshake, the version check, and optionally an identity check.
 
         A mod older than this client has no `protocol` field at all, which is itself the answer:
         anything without one predates the field and cannot be speaking version 1.
+
+        `expect_instance` guards against the failure this whole handshake exists for: two clients of
+        the same Minecraft version on one machine are otherwise indistinguishable, and a verifier
+        that reaches the wrong one reports a clean pass about the wrong world.
         """
         reply = self.request(verb="ping")
+        if expect_instance is not None:
+            actual = reply.get("gameDir")
+            if actual is None:
+                raise DevBridgeError(
+                    f"cannot check the instance: the mod on port {self.port} reported no gameDir. "
+                    f"A dedicated server has none, and a client older than this check does not send "
+                    f"one."
+                )
+            # A directory that does not exist is a typo in the argument, not a wrong game. Saying
+            # "wrong game" there blames the thing that is behaving correctly and sends whoever reads
+            # it looking in the wrong place.
+            if not Path(expect_instance).is_dir():
+                raise DevBridgeError(
+                    f"--expect-instance names a directory that does not exist: {expect_instance}. "
+                    f"The game on port {self.port} is running out of {actual}."
+                )
+            if Path(actual).resolve() != Path(expect_instance).resolve():
+                raise DevBridgeError(
+                    f"wrong game on port {self.port}: expected {expect_instance}, but this is "
+                    f"{actual} running world {reply.get('worldName')!r}. Nothing else in the reply "
+                    f"would have told you."
+                )
         if check_protocol:
             theirs = reply.get("protocol")
             if theirs != PROTOCOL_VERSION:

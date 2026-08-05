@@ -11,6 +11,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.fml.ModList;
 
 /**
  * What the verbs do, and the two threads they have to do it on.
@@ -83,8 +84,16 @@ final class Handlers {
         reply.addProperty("side", server.isDedicatedServer() ? "dedicated" : "integrated");
         reply.addProperty("mcVersion", SharedConstants.getCurrentVersion().name());
         reply.addProperty("hasClient", ClientHandlers.available(server));
-        // Whether this client will answer while you are looking at something else, and whether the
-        // mouse is yours. Both are worth knowing before a caller waits on a reply that will not come.
+
+        // WHICH GAME THIS IS, not just what kind. Two Minecraft 26.1.2 clients on one machine are
+        // indistinguishable from the fields above, and that is not hypothetical: a pack's verifier
+        // once connected to another project's dev client and reported a clean pass about the wrong
+        // world. A caller that can name what it expected can now check it got that.
+        reply.addProperty("worldName", server.getWorldData().getLevelName());
+        reply.addProperty("mods", ModList.get().size());
+
+        // Whether this client will answer while you are looking at something else, whether the
+        // mouse is yours, and which directory it is running out of.
         ClientHandlers.describe(reply, server);
         return reply;
     }

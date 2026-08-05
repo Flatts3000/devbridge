@@ -66,7 +66,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "run/screenshots/museum.png"}
 
 {"verb": "ping"}
-{"ok": true, "protocol": 1, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "pauseOnLostFocus": false, "inputLocked": true}
+{"ok": true, "protocol": 1, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a
@@ -76,11 +76,11 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 
 | Verb | Runs on | Notes |
 |---|---|---|
-| `ping` | either | Reports which side answered, the MC version, and on a client whether it pauses when unfocused and whether the mouse is locked. The handshake `gamebridge wait` polls |
+| `ping` | either | Reports which side answered, the MC version, which world and how many mods, and on a client its game directory plus whether it pauses when unfocused and whether the mouse is locked. The handshake `gamebridge wait` polls |
 | `cmd` | server thread | Executes with output captured. As the server console by default, or as a named `player` - see section 9 |
 | `screenshot` | client render thread | Names the file rather than taking the timestamped default, so a tool can find what it just took |
 | `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
-| `input` | client render thread | Hands the mouse back, or takes it again. Locked automatically on world load |
+| `input` | client render thread | Hands the mouse back, or takes it again. Not locked unless asked; see the decisions table |
 | `pause` | client render thread | Restores pausing on lost focus, or turns it off again. Off automatically on world load |
 | `stop` | either | Closes the world and quits. Lets a script own the whole lifecycle |
 

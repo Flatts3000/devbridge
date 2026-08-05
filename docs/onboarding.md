@@ -21,8 +21,16 @@ anywhere: the mod stays idle without an explicit port, and the client requires o
 that copies the same number lands on the same socket, which is not theoretical - two on one machine
 both used 25580, and a pack's verifier connected to a different game's dev client and reported a
 clean pass about the wrong world. That is why the examples below take a port rather than supply one.
-`gamebridge --devbridge <port> ping` reports which side answered, so a wrong connection is at least
-visible.
+`gamebridge --devbridge <port> ping` reports which game answered - the world name, the mod count and
+the directory it is running out of - so a wrong connection is visible rather than silent. In a
+script, assert it instead of reading it:
+
+```bash
+gamebridge --devbridge "$PORT" ping --expect-instance "$INSTANCE"
+```
+
+That exits non-zero against the wrong game, naming what it found. Worth making the first line of any
+unattended run, because every assertion after it inherits the assumption.
 
 Get the jar from [Releases](https://github.com/Flatts3000/devbridge/releases), or build it with
 `./gradlew build` and take it from `build/libs/`.
