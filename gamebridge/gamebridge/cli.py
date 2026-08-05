@@ -173,6 +173,37 @@ def cmd_pause(args) -> int:
     return 0
 
 
+def cmd_log(args) -> int:
+    """What the game has logged, so a silent failure stops being silent.
+
+    Reads the file rather than asking the game, which means it also works on a game that has already
+    died. The game directory comes from `ping` unless you name one.
+    """
+    from .logs import LogError, read_since
+
+    game_dir = args.game_dir
+    if game_dir is None:
+        if args.devbridge is None:
+            sys.exit("--game-dir required, or --devbridge so ping can report it")
+        with connect(args) as bridge:
+            game_dir = bridge.ping().get("gameDir")
+        if game_dir is None:
+            sys.exit("that side reported no gameDir, so name one with --game-dir")
+
+    try:
+        result = read_since(game_dir, since=args.since, level=args.level)
+    except LogError as exc:
+        sys.exit(f"log: {exc}")
+
+    for line in result["lines"]:
+        print(line)
+    # The marker goes to stderr so `gamebridge log > errors.txt` keeps the log clean and the cursor
+    # still reaches a human.
+    print(f"log: marker {result['marker']}, {result['errors']} error(s), "
+          f"{result['warnings']} warning(s)", file=sys.stderr)
+    return 1 if (args.fail_on_error and result["errors"]) else 0
+
+
 def cmd_stop(args) -> int:
     """Close the world and quit the game.
 
@@ -381,6 +412,17 @@ def main(argv: list[str] | None = None) -> int:
                       help="fail unless the game is running out of this directory. Two clients of "
                            "one Minecraft version are otherwise indistinguishable")
     ping.set_defaults(func=cmd_ping)
+
+    log = subs.add_parser("log", help="what the game logged, since a marker")
+    log.add_argument("--since", type=int, default=0, metavar="MARKER",
+                     help="byte offset from a previous run of this command")
+    log.add_argument("--level", default="WARN",
+                     help="minimum level to print (default: WARN)")
+    log.add_argument("--game-dir", default=None,
+                     help="the instance directory; taken from ping when omitted")
+    log.add_argument("--fail-on-error", action="store_true",
+                     help="exit non-zero if anything logged at ERROR or above")
+    log.set_defaults(func=cmd_log)
 
     halt = subs.add_parser("stop", help="close the world and quit the game (devbridge only)")
     halt.set_defaults(func=cmd_stop)

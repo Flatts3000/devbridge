@@ -116,6 +116,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `hud` | Show or hide the HUD |
 | `input` | Hand the mouse back, or take it |
 | `pause` | Restore pausing on lost focus, or turn it off |
+| `log` | What the game logged since a marker, so a silent failure stops being silent |
 | `stop` | Close the world and quit |
 
 **A toggle verb with no argument restores what vanilla does.** `hud on`, `input on`, `pause on` all
@@ -133,6 +134,19 @@ game is holding it.
 world spawn, so `@s` matches nothing and `~` is spawn-relative. A function ending in `tp @s ...`
 will place its scene perfectly and silently not move the camera. Pass `--player @s`, which takes the
 only player online.
+
+**A command that throws still reports success.** `cmd` returns what the command printed, and a
+failure deep inside a mod usually prints nothing, so an unattended run reports a clean pass for a
+scene that is not there. Bracket the run instead:
+
+```bash
+MARK=$(gamebridge --devbridge "$PORT" log --level ERROR 2>&1 >/dev/null | grep -oE 'marker [0-9]+' | cut -d' ' -f2)
+gamebridge --devbridge "$PORT" --player @s cmd "function yourpack:showcase/hall"
+gamebridge --devbridge "$PORT" log --since "$MARK" --level ERROR --fail-on-error
+```
+
+It reads the log file rather than asking the game, so it also works on a game that has already
+died - which is exactly when you most want it.
 
 **`shot` only returns a path when you name the file.** Without a name the file gets Minecraft's
 timestamped default, chosen inside the capture and never handed back, so the reply carries a message
