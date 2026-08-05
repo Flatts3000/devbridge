@@ -120,6 +120,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `cursor` | Move the pointer, which is what makes a tooltip render |
 | `click` | Press and release at a point. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
 | `probe` | Block entity data at a position, or `--is` to test what block it is |
+| `ps` | What has been launched, and whether it is still running |
 | `log` | What the game logged since a marker, so a silent failure stops being silent |
 | `stop` | Close the world and quit |
 
@@ -138,6 +139,20 @@ game is holding it.
 world spawn, so `@s` matches nothing and `~` is spawn-relative. A function ending in `tp @s ...`
 will place its scene perfectly and silently not move the camera. Pass `--player @s`, which takes the
 only player online.
+
+**A dead game used to look like a refused socket.** `launch` records what it started, so anything
+that fails to connect afterwards says which of the three things happened rather than leaving you to
+work it out:
+
+```
+bridge: could not connect (...actively refused it)
+bridge: the client exited. It was pid 27480, launched from C:/.../Instances/YourPack at world
+        'New World'. Its log: C:/.../logs/latest.log
+```
+
+`gamebridge ps` lists what has been launched and whether it is still there. Liveness is checked by
+looking for that port in the process's command line, not by the pid alone, so a recycled pid
+belonging to something unrelated reads as exited rather than as a healthy game.
 
 **A command that throws still reports success.** `cmd` returns what the command printed, and a
 failure deep inside a mod usually prints nothing, so an unattended run reports a clean pass for a
