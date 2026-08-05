@@ -1,10 +1,16 @@
 package dev.mcbridge.devbridge;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.Window;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -37,7 +43,41 @@ final class ScreenDriver {
     private ScreenDriver() {
     }
 
-    /** What is open, and how big its coordinate space is. */
+    /**
+     * How deep to walk into nested containers. Four covers a list inside a tab inside a screen, which
+     * is as nested as vanilla gets.
+     */
+    private static final int MAX_DEPTH = 4;
+
+    /**
+     * A ceiling on how many widgets one reply carries. A creative inventory's item grid is hundreds
+     * of slots and nobody clicks them by name; the cap keeps a reply readable, and
+     * {@code widgetsComplete} says when it bit rather than letting a short list read as a full one.
+     */
+    private static final int MAX_WIDGETS = 200;
+
+    /**
+     * What is open, how big its coordinate space is, and what is in it.
+     *
+     * <p><b>The widget list is what makes clicking scriptable.</b> Without it a caller works out
+     * coordinates from outside the game: vanilla's death screen puts its buttons at
+     * {@code height / 4 + 72}, so you can derive Respawn's centre by knowing Minecraft's source, and
+     * a modded tab can only be measured off a screenshot and divided by the GUI scale. Both are
+     * arithmetic about somebody else's layout, and neither survives a resize, a GUI scale change, or
+     * the mod moving the widget. Asking the screen what it drew survives all three.
+     *
+     * <p><b>Bounds come from {@code getRectangle()}, which every child has</b> - it is a default
+     * method on {@code GuiEventListener} rather than something only widgets implement, so a child
+     * that is not an {@code AbstractWidget} still reports where it is. Its default is
+     * {@code ScreenRectangle.empty()}, which is indistinguishable from a real zero-sized widget, so
+     * an empty rectangle is reported as {@code null} bounds rather than as zeros. A caller that
+     * clicks a reported centre then cannot be sent to (0, 0) by a widget that never said where it
+     * was.
+     *
+     * <p><b>Coordinates are the same GUI-scaled space {@code click} and {@code cursor} take</b>, so a
+     * centre from here can be handed straight back without conversion. That was worth stating: the
+     * space was previously only inferable from the reported width and height.
+     */
     static JsonObject describe() throws Exception {
         return onClient(client -> {
             JsonObject reply = Handlers.ok();
@@ -50,8 +90,96 @@ final class ScreenDriver {
             reply.addProperty("title", screen.getTitle().getString());
             reply.addProperty("width", screen.width);
             reply.addProperty("height", screen.height);
+
+            JsonArray widgets = new JsonArray();
+            boolean complete = collect(screen, widgets, 0);
+            reply.add("widgets", widgets);
+            reply.addProperty("widgetsComplete", complete);
             return reply;
         });
+    }
+
+    /**
+     * Walk a container's children, appending one entry each.
+     *
+     * <p>Returns whether the walk finished. It stops short when the cap is hit or the depth limit
+     * cuts off a container that still had children, and the caller reports that as
+     * {@code widgetsComplete: false} - a truncated list that claims to be whole is how a caller
+     * concludes a button does not exist.
+     */
+    private static boolean collect(GuiEventListener parent, JsonArray out, int depth) {
+        List<? extends GuiEventListener> children;
+        try {
+            if (!(parent instanceof ContainerEventHandler container)) {
+                return true;
+            }
+            children = container.children();
+        } catch (Throwable t) {
+            // A mod's screen deciding to throw here is its business, not a reason to fail the verb.
+            return false;
+        }
+
+        boolean complete = true;
+        for (GuiEventListener child : children) {
+            if (out.size() >= MAX_WIDGETS) {
+                return false;
+            }
+            out.add(describe(child, depth));
+            if (depth + 1 < MAX_DEPTH) {
+                complete &= collect(child, out, depth + 1);
+            } else if (child instanceof ContainerEventHandler nested && !nested.children().isEmpty()) {
+                complete = false;
+            }
+        }
+        return complete;
+    }
+
+    /**
+     * One widget, as much as it will say about itself.
+     *
+     * <p>Everything past the class name is guarded, because these are calls into arbitrary mod code:
+     * a {@code getMessage} that throws would otherwise take out the whole listing, and a listing that
+     * fails because one widget in a pack's quest book is unusual is worth less than a listing with
+     * one thin entry in it.
+     */
+    private static JsonObject describe(GuiEventListener child, int depth) {
+        JsonObject json = new JsonObject();
+        Class<?> type = child.getClass();
+        json.addProperty("type", shortName(type));
+        json.addProperty("class", type.getName());
+        json.addProperty("depth", depth);
+
+        if (child instanceof AbstractWidget widget) {
+            try {
+                json.addProperty("text", widget.getMessage().getString());
+            } catch (Throwable t) {
+                json.add("text", null);
+            }
+            json.addProperty("active", widget.isActive());
+            json.addProperty("visible", widget.visible);
+            json.addProperty("focused", widget.isFocused());
+            json.addProperty("hovered", widget.isHovered());
+        }
+
+        ScreenRectangle rect;
+        try {
+            rect = child.getRectangle();
+        } catch (Throwable t) {
+            rect = ScreenRectangle.empty();
+        }
+        if (rect.width() > 0 && rect.height() > 0) {
+            json.addProperty("x", rect.left());
+            json.addProperty("y", rect.top());
+            json.addProperty("width", rect.width());
+            json.addProperty("height", rect.height());
+            json.addProperty("centerX", rect.left() + rect.width() / 2);
+            json.addProperty("centerY", rect.top() + rect.height() / 2);
+        } else {
+            for (String key : new String[] {"x", "y", "width", "height", "centerX", "centerY"}) {
+                json.add(key, null);
+            }
+        }
+        return json;
     }
 
     /**
@@ -164,6 +292,23 @@ final class ScreenDriver {
             reply.addProperty("changedScreen", !before.equals(after));
             return reply;
         });
+    }
+
+    /**
+     * A name short enough to read and long enough to mean something.
+     *
+     * <p>The simple name alone is not either. Vanilla's ordinary button is {@code Button$Plain},
+     * whose simple name is {@code Plain}, which names nothing; an anonymous subclass has no simple
+     * name at all. So a nested class keeps its enclosing class, and an anonymous one falls back to
+     * the binary name, which is ugly but identifies something.
+     */
+    private static String shortName(Class<?> type) {
+        String simple = type.getSimpleName();
+        if (simple.isEmpty()) {
+            return type.getName();
+        }
+        Class<?> enclosing = type.getEnclosingClass();
+        return enclosing == null ? simple : enclosing.getSimpleName() + "." + simple;
     }
 
     /** Screens are render-thread state, so every one of these has to happen there and be waited on. */

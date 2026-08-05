@@ -138,7 +138,7 @@ One request per line, one reply per line.
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
 | `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
 | `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
-| `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270}` |
+| `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270,"widgets":[...],"widgetsComplete":true}` |
 | `cursor` | client render thread | `x`, `y` (GUI-scaled) | `{"ok":true,"x":167,"y":144,"rawX":668,"rawY":576}` |
 | `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"onPress":true,"onRelease":false,"handled":true,"screenBefore":"...","screen":"...","changedScreen":false}` |
 | `stop` | either | none | `{"ok":true,"quits":true}` - closes the world, and on a client quits the game |
@@ -147,6 +147,25 @@ One request per line, one reply per line.
 empty background) and under-report (a quest-book tab acts while returning false), and even a screen
 change lands late because consequences are asynchronous. Treat the fields as observations and check
 the result with `screen` or a screenshot.
+
+**`screen` lists what the screen drew, so you do not have to compute where to click.** Each widget
+carries its `text`, its bounds, and a `centerX`/`centerY` in the same GUI-scaled space `click` takes:
+
+```json
+{"type":"Button.Plain","class":"net.minecraft.client.gui.components.Button$Plain","depth":0,
+ "text":"Respawn","active":true,"visible":true,"focused":false,"hovered":false,
+ "x":113,"y":132,"width":200,"height":20,"centerX":213,"centerY":142}
+```
+
+Ask rather than derive. Vanilla's death screen puts its buttons at `height / 4 + 72`, so you can work
+Respawn out of Minecraft's source - and that gives you 132, the button's top edge, not its centre. It
+lands inside the button by one pixel and stops being right the moment anything moves. `gamebridge
+click --text Respawn` cannot make that mistake, and survives a resize, a GUI scale change, and the
+mod rearranging its own screen.
+
+Bounds are `null` for a child that reports no rectangle, rather than zeros that would send a click to
+the corner. `widgetsComplete` is `false` when the list was cut short by the depth or size cap - a
+truncated list that claimed to be whole is how you conclude a button does not exist.
 
 `protocol` is the wire protocol's version, and `gamebridge` refuses to talk to a mod whose number it
 does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning: adding either does not

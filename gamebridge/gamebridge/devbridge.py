@@ -113,6 +113,13 @@ class DevBridge:
         The reply carries the screen's width and height in GUI-scaled coordinates, which is the
         space `cursor` and `click` work in. Work out where to point from those rather than from the
         window size: they differ whenever the GUI scale is not 1.
+
+        `widgets` lists what the screen drew, each with `text`, `x`/`y`/`width`/`height` and a
+        `centerX`/`centerY` ready to hand to `click`, in that same coordinate space. Prefer finding
+        a widget by its text over computing a coordinate: the computed one breaks on a resize, a GUI
+        scale change, or the mod moving the button, and breaks silently by clicking whatever moved
+        into that spot. Bounds are null for a child that does not report a rectangle, and
+        `widgetsComplete` is false when the list was cut short by the depth or size cap.
         """
         return self.request(verb="screen", **({} if open is None else {"open": open}))
 

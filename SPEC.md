@@ -82,7 +82,7 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
 | `input` | client render thread | Hands the mouse back, or takes it again. Not locked unless asked; see the decisions table |
 | `pause` | client render thread | Restores pausing on lost focus, or turns it off again. Off automatically on world load |
-| `screen` | client render thread | Reports the open GUI, its title and its GUI-scaled size; opens the inventory or closes anything |
+| `screen` | client render thread | Reports the open GUI, its title, its GUI-scaled size, and the widgets in it - each with its label, bounds and a click point in that same space. Opens the inventory or closes anything |
 | `cursor` | client render thread | Moves the pointer, which is what renders a tooltip. Moves the real OS cursor, not just the screen's idea of it |
 | `click` | client render thread | Press and release at a point. Reports what it saw, none of which is a verdict: screens over- and under-report, and consequences land asynchronously. Verify with `screen` or a picture |
 | `stop` | either | Halts the world, and on a client quits the game. Quitting matters: a client left at the title screen keeps the world's file locks, and the next launch fails looking like a corrupt save |
