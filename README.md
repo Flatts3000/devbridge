@@ -173,6 +173,12 @@ verified API details, and what is deliberately out of scope.
 Releases attach the jar and nothing else. It is published to no Maven repository on purpose: a
 resolvable artifact is one `runtimeOnly` away from ending up inside somebody's shipped mod.
 
+## Getting started
+
+[`docs/onboarding.md`](docs/onboarding.md) walks through both ways in: a mod repo, where a Gradle run
+block owns the launch, and a modpack, where `gamebridge launch` starts the game instead. It also
+lists the four things that reliably bite first.
+
 ## Contributing
 
 `CONTRIBUTING.md` covers the build, how to verify a change against a live instance, and the three

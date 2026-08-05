@@ -173,6 +173,21 @@ def cmd_pause(args) -> int:
     return 0
 
 
+def cmd_stop(args) -> int:
+    """Close the world and quit the game.
+
+    devbridge only, and not the same thing as running `stop` as a command: that is a dedicated
+    server's console command and does not exist in singleplayer, which is the case this whole tool
+    is for. Without this an unattended loop can start a game and never close one.
+    """
+    if args.devbridge is None:
+        sys.exit("--devbridge required: for a dedicated server, `cmd stop` is the console command")
+    with connect(args) as bridge:
+        bridge.stop()
+    print("stopping")
+    return 0
+
+
 def cmd_ping(args) -> int:
     """Handshake, and the protocol version check.
 
@@ -348,6 +363,9 @@ def main(argv: list[str] | None = None) -> int:
 
     ping = subs.add_parser("ping", help="handshake and protocol check (devbridge only)")
     ping.set_defaults(func=cmd_ping)
+
+    halt = subs.add_parser("stop", help="close the world and quit the game (devbridge only)")
+    halt.set_defaults(func=cmd_stop)
 
     start = subs.add_parser("launch", help="start a CurseForge instance with devbridge enabled")
     start.add_argument("--instance", required=True, metavar="DIR",
