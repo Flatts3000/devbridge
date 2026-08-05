@@ -162,6 +162,15 @@ by running exactly that sequence against the Trashlands pack: launch, `cmd` as `
   them and every one added is a thing to maintain. A worked example: a `freeze` verb was proposed
   (#15) to pin particles, clouds and animation for reproducible shots, and `cmd "tick freeze"` turns
   out to make two captures byte-identical, animated textures included. Measured, then closed.
+- **Anything whose only benefit is fewer round trips.** A `batch` verb was proposed (#19) to fold
+  several requests into one server-thread hop. Measured first: `cmd` costs 0.11-0.18 ms, so the
+  hundred-call loop that motivated it spends about 25 ms on the bridge. Queued tasks do not wait for
+  a tick, because the server drains its queue continuously while waiting for one, and `/tick sprint`
+  - a server that never idles - measures the same. Closed on the numbers.
+- **Player telemetry.** Position, rotation, velocity and on-ground are all `data get entity`,
+  including real `Motion` for a player, which is worth stating because movement is
+  client-authoritative and it could easily have read zero. `look` reports the camera and the
+  crosshair hit precisely because those two are the residue that no command reaches.
 - **Running in production.** Not a debug tool for shipped mods, not a server admin tool. RCON exists.
 - **Rendering without a window.** Minecraft needs a real GL context; there is no headless client. The
   window opens, it just does not need anybody looking at it.
@@ -184,6 +193,21 @@ which is the argument for building the loop before polishing it.
   `Screenshot.grab` takes the framebuffer as it already is, so hiding and grabbing in one call would
   still catch the frame that was drawn with the HUD up. A caller hides, shoots, and shows again, and
   a run of shots shares one toggle.
+
+Two more, from driving GUIs rather than from shooting scenes:
+
+- **Clicking meant arithmetic about somebody else's layout.** `screen` reported that a click was
+  possible and not where: both clicks this repo needed were derived, one from vanilla's source and
+  one measured off a screenshot and divided by the GUI scale. Neither survives a resize, a GUI scale
+  change, or a mod moving its own widget - and it fails silently, by clicking whatever moved into
+  that spot. Fixed by `screen` listing widgets with their bounds and a click point, and
+  `click --text`. The derived coordinate turned out to be the button's top edge rather than its
+  centre, which is the argument in miniature.
+- **A sized capture silently changed the GUI it was capturing.** Resizing the window for the shot
+  lays the screen out again: 480x270 became 342x256 at 1024x768, the scale dropping from 4 to 3.
+  Coordinates measured off such an image point elsewhere the moment the window is itself again.
+  Fixed by reporting both layouts and a `guiRelayout` flag rather than by refusing the shot, since
+  widget bounds now make measuring off an image unnecessary anyway.
 
 ## 10. Open
 

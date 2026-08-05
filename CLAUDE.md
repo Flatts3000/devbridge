@@ -78,8 +78,8 @@ published to any Maven repository, deliberately.
 
 ## Architecture
 
-Two halves. `src/` is the mod, eight classes, and the split between the server-safe four and the
-client-only four is a load-bearing safety property, not taste. `gamebridge/gamebridge/` is the
+Two halves. `src/` is the mod, nine classes, and the split between the server-safe four and the
+client-only five is a load-bearing safety property, not taste. `gamebridge/gamebridge/` is the
 client: `devbridge.py` (this protocol), `rcon.py` (the other transport), `launch.py` (starting a
 game, which is not a verb because nothing is listening yet), and `cli.py` over the top.
 
@@ -98,14 +98,15 @@ The mod:
   and the `ok()` / `error()` reply builders. Owns the command-output capture and `findPlayer`.
   Unknown verbs fail loudly.
 - **`ClientHandlers`** - the dist guard. Answers `available()` and refuses every client verb
-  (`screenshot`, `hud`, `input`, `pause`, `screen`, `cursor`, `click`) with a message when there is
-  no client. Also the one place
+  (`screenshot`, `hud`, `input`, `pause`, `screen`, `cursor`, `click`, `look`) with a message when
+  there is no client. Also the one place
   the automatic world-load setup and the extra `ping` fields go through, so nothing else has to know
   which side it is on.
-- **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`**, **`ScreenDriver`** - the only classes that touch
-  `Minecraft`, reached solely through `ClientHandlers` after the guard passes: capture and HUD
-  toggle; client-level state and lifecycle (pause-on-lost-focus, game directory, quitting); the
-  mouse lock; and GUI driving. Adding a client-only class means adding it to the list in
+- **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`**, **`ScreenDriver`**, **`Sightline`** -
+  the only classes that touch `Minecraft`, reached solely through `ClientHandlers` after the guard
+  passes: capture and HUD toggle; client-level state and lifecycle (pause-on-lost-focus, game
+  directory, quitting); the mouse lock; GUI listing and driving; and the camera plus what the
+  crosshair is on. Adding a client-only class means adding it to the list in
   `check_invariants.sh`, which is deliberate friction.
 
 Request flow: socket thread parses, `Handlers` queues onto the server thread (`server.execute`) or the
@@ -114,7 +115,8 @@ then writes the reply.
 
 Protocol shape and verb table are in `README.md`; `SPEC.md` carries the design rationale, section 8
 is what is deliberately out of scope, section 9 is what has been resolved and why, and section 10 is
-the remaining open work (forcing a screenshot resolution).
+empty on purpose - the design has no unanswered questions left, and open work lives in the issue
+tracker.
 
 ## Things that cost time to rediscover
 
@@ -160,6 +162,28 @@ the remaining open work (forcing a screenshot resolution).
   and closing a screen, which has no pre-event and is caught by the client tick listener instead.
   The click cancel is skipped whenever a screen or overlay is open, or you could not click Back to
   Game.
+- **A round trip is not the slow part, so do not batch.** Measured on two live clients: `cmd` costs
+  0.11-0.18 ms, so a hundred sequential commands is under 20 ms of bridge overhead. Queued tasks do
+  not wait for a tick boundary, because the server thread drains its queue continuously while waiting
+  for the next tick, and `/tick sprint` - a server that never idles, the one case where the tick-wait
+  reasoning could have held - measures the same. A `batch` verb was proposed and closed on those
+  numbers (#19).
+- **Ask the screen where its widgets are; do not derive coordinates.** `screen` lists them because
+  layout arithmetic is somebody else's business and it breaks silently: deriving vanilla's Respawn
+  button from `height / 4 + 72` gives 132, which is the button's *top edge*, and it worked only
+  because the bound is inclusive. Bounds come from `getRectangle()`, a default on `GuiEventListener`
+  rather than something only widgets have, and its default is an empty rectangle - reported as null
+  rather than as zeros, or a caller clicks (0, 0).
+- **A sized screenshot re-lays-out an open GUI.** The window is a different shape for the moment of
+  the capture, so the GUI scale can change with it: 480x270 became 342x256 at a 1024x768 capture. The
+  reply says so (`guiRelayout`), and the two layouts are not a scale apart, so nothing converts
+  between them. For GUI coordinates use `screen`, which reports the live layout.
+- **`data get entity` already answers player telemetry, including velocity.** Position, rotation,
+  on-ground and real `Motion` all come back from a command, despite movement being
+  client-authoritative. `look` therefore reports only the two things nothing else can: the camera,
+  which is not the player in third person or spectator, and what the crosshair is on. Naming an
+  arbitrary block is also not command-reachable - `/data get block` refuses anything that is not a
+  block entity - which is why a block hit carries the canonical `id[properties]` form.
 
 ## Conventions
 

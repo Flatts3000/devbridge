@@ -60,14 +60,17 @@ So verification is manual, and a PR should say what was done:
 4. At minimum: `{"verb":"ping"}` for the handshake, `{"verb":"cmd","command":"time set day"}` for the
    server thread, and `{"verb":"screenshot","name":"test"}` for the render thread. If you touched
    command execution, also run one with `"player":"@s"`, which takes a different source stack than
-   the console path and is the half that silently does nothing when it breaks.
+   the console path and is the half that silently does nothing when it breaks. If you touched the
+   GUI or camera verbs, `{"verb":"screen"}` with something open and `{"verb":"look"}` in a world,
+   since both read state that only exists mid-frame.
 
 CI builds the jar and checks the invariants. It cannot do step 4, which is why the PR template asks.
 
 ## Scope
 
 `SPEC.md` section 8 is the out-of-scope list, section 9 records what has been resolved and why the
-fix took the shape it did, and section 10 is what is still open. Read them before proposing a
+fix took the shape it did, and section 10 is empty on purpose: the design has no unanswered questions
+left, so open work lives in the issue tracker. Read them before proposing a
 feature.
 
 The short version: **anything a command can already do is out of scope.** No verb for teleporting,
