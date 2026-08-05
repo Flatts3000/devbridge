@@ -15,9 +15,9 @@ install. They live together because they are two halves of one wire protocol, an
 separate repos is how a client quietly stops being able to speak to its own mod.
 
 ```
-$ gamebridge --devbridge 25580 cmd "function mymod:showcase/museum"
+$ gamebridge --devbridge $PORT cmd "function mymod:showcase/museum"
 Running function mymod:showcase/museum
-$ gamebridge --devbridge 25580 shot museum
+$ gamebridge --devbridge $PORT shot museum
 .\screenshots\museum.png
 ```
 
@@ -60,7 +60,7 @@ Drop the jar in your dev run's `run/mods/`, then in your mod's `build.gradle`:
 runs {
     client {
         client()
-        systemProperty 'devbridge.port', '25580'
+        systemProperty 'devbridge.port', '<a port you claimed>'
 
         // Both default to true and only 'false' turns one off.
         // keepTicking: keep the world running while the window is in the background.
@@ -80,16 +80,28 @@ Then talk to it with any client that speaks newline-delimited JSON over TCP. The
 
 ```
 pip install "gamebridge @ git+https://github.com/Flatts3000/devbridge.git#subdirectory=gamebridge"
-gamebridge --devbridge 25580 ping
+gamebridge --devbridge <your port> ping
 ```
 
 Stdlib-only, no dependencies. `pip install` puts no jar anywhere: the CLI and the mod reach you by
 completely separate routes, which is why one can be installable while the other is never published.
 
-**Pick your own port and do not copy the one in these examples.** Every project that copies `25580`
-lands on the same number, and a verifier that connects to a different game's dev client will report
-a clean pass about the wrong world. It has happened. `gamebridge --devbridge <port> ping` reports
-which side answered and the protocol version, so a wrong connection is at least visible.
+**Pick your own port.** There is no default anywhere: the mod stays idle without one and the client
+requires one. Every project that copies the same number out of a README lands on the same socket,
+and a verifier that connects to a different game's dev client will report a clean pass about the
+wrong world. It has happened. `gamebridge --devbridge <port> ping` reports which side answered and
+the protocol version, so a wrong connection is at least visible.
+
+**No build tool? The CLI can start the game itself.** A modpack has no Gradle run block, and the
+CurseForge app offers no field for a system property, so `gamebridge launch` builds the command line
+from the app's own install and runs it with the property set:
+
+```
+gamebridge launch --instance "C:/.../Instances/YourPack" --port <your port> --world "New World" --wait
+```
+
+`--wait` blocks until the mod answers and checks the protocol version.
+[`docs/onboarding.md`](docs/onboarding.md) covers both routes properly.
 
 **Loading a world turns off pause-on-lost-focus for you, the same as pressing F3+P.** Every use of
 this mod involves the window not being focused, and a singleplayer world left to itself opens the

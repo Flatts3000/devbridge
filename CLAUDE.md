@@ -35,11 +35,19 @@ here would only ever launch an empty world.
 
 ### Verifying a change
 
-The only real test is against a live instance. Build, drop the jar in the target mod's `run/mods/`,
-add `systemProperty 'devbridge.port', '25580'` to that project's client run, launch, then speak
-newline-delimited JSON at `localhost:25580`. `{"verb":"ping"}` confirms the socket, the side, and
-whether a client is present. The reference client is `gamebridge`, a Python CLI living outside this
-repo.
+The only real test is against a live instance, and there are two ways to get one.
+
+**A mod's dev run.** Build, drop the jar in the target mod's `run/mods/`, add
+`systemProperty 'devbridge.port', '<a port you claimed>'` to that project's client run, launch, then
+speak newline-delimited JSON at `localhost:<that port>`. Connect to `localhost`, never the IPv4
+literal.
+
+**A pack, with no build tool.** `python -m gamebridge.cli launch --instance <dir> --port <port>
+--world <name> --wait` starts one and blocks until it answers. That is the faster loop of the two,
+and it is how the client verbs were actually verified.
+
+Either way `{"verb":"ping"}` confirms the socket, the side, the protocol version, and whether a
+client is present. The reference client is `gamebridge`, in `gamebridge/` in this repo.
 
 Version, mod metadata, and MC/NeoForge coordinates all live in `gradle.properties` and are expanded
 into `neoforge.mods.toml` at build time. Change them there, never in the toml.
@@ -69,8 +77,12 @@ published to any Maven repository, deliberately.
 
 ## Architecture
 
-Seven classes, and the split between the server-safe four and the client-only three is a
-load-bearing safety property, not taste.
+Two halves. `src/` is the mod, seven classes, and the split between the server-safe four and the
+client-only three is a load-bearing safety property, not taste. `gamebridge/gamebridge/` is the
+client: `devbridge.py` (this protocol), `rcon.py` (the other transport), `launch.py` (starting a
+game, which is not a verb because nothing is listening yet), and `cli.py` over the top.
+
+The mod:
 
 - **`DevBridge`** - the `@Mod` entry point. Reads `devbridge.port`; if unset or unparseable it logs
   and registers nothing at all. Otherwise it subscribes to `ServerStartedEvent` / `ServerStoppingEvent`

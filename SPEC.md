@@ -1,7 +1,13 @@
 # devbridge - spec
 
-**Status: built, phases 1 to 3.** Verified end to end on 26.1.2: a command placed a scene in a singleplayer world and a screenshot came back, both from the CLI with nobody touching the game. A dev-only mod that lets tooling outside the game drive a running
-Minecraft instance: run commands, take screenshots, and read the answers back.
+**Status: built, all four phases.** Verified end to end on 26.1.2, from a cold machine: the CLI
+started the game, quick-played into a world as an offline player, ran a command, took a screenshot at
+a forced resolution, and quit, with nobody touching the game at any point. A dev-only mod that lets
+tooling outside the game drive a running Minecraft instance, plus `gamebridge`, the CLI that drives
+it.
+
+Open work lives in [the issue tracker](https://github.com/Flatts3000/devbridge/issues) rather than in
+this document. Section 10 records what is still open at the design level.
 
 ## 0. Why, given gamebridge already exists
 
@@ -23,7 +29,7 @@ screenshots in the loop, "change a number, rebuild, reshoot, look" is one comman
 | Decision | Answer | Why |
 |---|---|---|
 | Shape | **A separate mod jar**, not a source set inside a mod | It cannot leak into a release if it is never part of one. A `src/dev` folder relies on somebody keeping it out of the build forever |
-| Home | `mc-pack-toolkit/devbridge/`, its own Gradle project | The toolkit is where cross-mod tooling lives. Any mod's dev run can drop the jar in; nothing about it is Recompile-specific |
+| Home | **Its own public repo**, `github.com/Flatts3000/devbridge`, holding both the mod and the CLI | Started life inside `mc-pack-toolkit` and moved out for being a standalone mod meant to be published. The CLI followed in #4, for the opposite half of the same reason: it is not a pack-authoring tool, it is one end of a protocol whose other end is this mod. Any mod's dev run can drop the jar in; nothing about it is Recompile-specific |
 | Transport | **Loopback TCP, newline-delimited JSON** | Same shape as RCON so `gamebridge` can speak both, but trivially implementable on both sides. JSON because a screenshot reply carries a path and an error carries a message |
 | Off by default | **Requires `-Ddevbridge.port=<n>`** | Present-but-inert is the safe default. With no property the mod registers nothing and opens no socket |
 | Binding | **127.0.0.1 only, never 0.0.0.0** | This executes arbitrary commands. See the security note, which is not a formality |
@@ -123,8 +129,14 @@ gamebridge --devbridge 25580 cmd "function recompile:showcase/museum"
 gamebridge --devbridge 25580 shot museum
 ```
 
-RCON stays the default for dedicated servers. The two transports answer the same verbs; only
-`screenshot` is devbridge-only, and it fails with a clear message over RCON rather than hanging.
+RCON stays the default for dedicated servers. The two transports share `cmd` and the assertions
+built on it. **Everything that touches the client is devbridge-only** - `screenshot`, `hud`, `input`,
+`pause` and `stop` - and each fails with a clear message over RCON rather than hanging. (This
+originally said only `screenshot` was devbridge-only, which stopped being true as the client verbs
+were added.)
+
+`launch` is not a verb at all. It starts the game, so there is nothing listening yet to send it to;
+it lives only in the CLI. See section 7, phase 4.
 
 ## 7. Build order
 
@@ -134,6 +146,11 @@ RCON stays the default for dedicated servers. The two transports answer the same
 3. **`gamebridge` transport flag**, so existing scripts keep working.
 4. **A one-command showcase loop**: launch, quickplay into the studio world, place a scene, shoot it,
    quit. This is the point the whole thing has been aiming at.
+
+**All four shipped.** Phase 4 landed as `gamebridge launch` (#5, #6), which builds the same command
+line the CurseForge app would from the app's own install and needs no launcher of its own. Verified
+by running exactly that sequence against the Trashlands pack: launch, `cmd` as `@s`, `hud off`,
+`screenshot` (a valid 1280x720 PNG), `stop`.
 
 ## 8. Out of scope
 
@@ -164,5 +181,13 @@ which is the argument for building the loop before polishing it.
 
 ## 10. Open
 
-- **Screenshot resolution.** Whether to force a window size for reproducible framing, or accept
-  whatever the window happens to be. Probably force it, since the gallery wants consistent dimensions.
+- **Screenshot resolution. Half answered.** The question was whether to force a window size for
+  reproducible framing. `gamebridge launch --width/--height` does force it, and a shot taken through
+  a launched client comes back at exactly those dimensions. What is still open is the other half: a
+  shot taken against a client somebody started by hand is whatever that window happens to be, so the
+  resolution is a property of how the game was launched rather than of the request. Rendering to an
+  offscreen target at a size named on the `screenshot` request would decouple them. Tracked as
+  [#14](https://github.com/Flatts3000/devbridge/issues/14).
+
+Everything else that is open is in [the issue tracker](https://github.com/Flatts3000/devbridge/issues).
+This section is for questions the design has not answered, not for a backlog.
