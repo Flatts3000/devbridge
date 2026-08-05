@@ -118,7 +118,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `pause` | Restore pausing on lost focus, or turn it off |
 | `screen` | What GUI is open, or open the inventory / close what is open |
 | `cursor` | Move the pointer, which is what makes a tooltip render |
-| `click` | Press and release at a point |
+| `click` | Press and release at a point. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
 | `probe` | Block entity data at a position, or `--is` to test what block it is |
 | `log` | What the game logged since a marker, so a silent failure stops being silent |
 | `stop` | Close the world and quit |

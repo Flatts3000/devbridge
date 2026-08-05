@@ -61,7 +61,7 @@ about the wrong game.
 
 ```
 gamebridge --devbridge 8604 ping                      handshake, side, and protocol check
-gamebridge --devbridge 8604 cmd "time set day" --player @s
+gamebridge --devbridge 8604 --player @s cmd "time set day"   options precede the verb
 gamebridge --devbridge 8604 hud off                   keep the HUD out of the shot
 gamebridge --devbridge 8604 shot museum               capture, once the file is on disk
 gamebridge --devbridge 8604 input on                  hand the mouse back for manual framing

@@ -104,8 +104,9 @@ The mod:
   which side it is on.
 - **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`**, **`ScreenDriver`** - the only classes that touch
   `Minecraft`, reached solely through `ClientHandlers` after the guard passes: capture and HUD
-  toggle, pause-on-lost-focus, the mouse lock, and GUI driving respectively. Adding a client-only class means
-  adding it to the list in `check_invariants.sh`, which is deliberate friction.
+  toggle; client-level state and lifecycle (pause-on-lost-focus, game directory, quitting); the
+  mouse lock; and GUI driving. Adding a client-only class means adding it to the list in
+  `check_invariants.sh`, which is deliberate friction.
 
 Request flow: socket thread parses, `Handlers` queues onto the server thread (`server.execute`) or the
 render thread (`Minecraft.execute`), socket thread blocks on a `CompletableFuture` with a 30s timeout,

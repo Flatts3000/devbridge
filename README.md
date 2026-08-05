@@ -83,6 +83,10 @@ pip install "gamebridge @ git+https://github.com/Flatts3000/devbridge.git#subdir
 gamebridge --devbridge <your port> ping
 ```
 
+`--version` reports the package version and the wire protocol it speaks. `--json` makes any command
+print its reply object instead of a sentence, which is the surface a script or an agent should read:
+sentences here get reworded whenever one turns out not to say what actually went wrong.
+
 Stdlib-only, no dependencies. `pip install` puts no jar anywhere: the CLI and the mod reach you by
 completely separate routes, which is why one can be installable while the other is never published.
 
@@ -136,8 +140,13 @@ One request per line, one reply per line.
 | `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
 | `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270}` |
 | `cursor` | client render thread | `x`, `y` (GUI-scaled) | `{"ok":true,"x":167,"y":144,"rawX":668,"rawY":576}` |
-| `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"handled":true}` |
+| `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"onPress":true,"onRelease":false,"handled":true,"screenBefore":"...","screen":"...","changedScreen":false}` |
 | `stop` | either | none | `{"ok":true,"quits":true}` - closes the world, and on a client quits the game |
+
+**Nothing `click` returns is a verdict.** Screens over-report (a creative inventory answers clicks on
+empty background) and under-report (a quest-book tab acts while returning false), and even a screen
+change lands late because consequences are asynchronous. Treat the fields as observations and check
+the result with `screen` or a screenshot.
 
 `protocol` is the wire protocol's version, and `gamebridge` refuses to talk to a mod whose number it
 does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning:
