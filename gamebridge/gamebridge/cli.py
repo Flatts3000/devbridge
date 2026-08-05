@@ -213,20 +213,26 @@ def cmd_launch(args) -> int:
     except LaunchError as exc:
         sys.exit(f"launch: {exc}")
 
-    problems = verify(command)
-    if problems:
-        for problem in problems:
-            print(f"launch: {problem}", file=sys.stderr)
-        sys.exit("launch: refusing to start with a classpath that does not resolve")
-
     if args.dry_run:
+        # Printed before the checks, and printed even when they fail. --dry-run exists to show why a
+        # launch would not work, and withholding the command line in exactly the case somebody is
+        # debugging is the wrong way round.
+        #
         # Quoted the way the platform would, so a world name with a space in it reads as one
         # argument. The real launch passes a list and never goes near a shell.
         if os.name == "nt":
             print(subprocess.list2cmdline(command))
         else:
             print(shlex.join(command))
+        for problem in verify(command):
+            print(f"launch: {problem}", file=sys.stderr)
         return 0
+
+    problems = verify(command)
+    if problems:
+        for problem in problems:
+            print(f"launch: {problem}", file=sys.stderr)
+        sys.exit("launch: refusing to start with a classpath that does not resolve")
 
     process = launch(command, instance)
     print(f"launched pid {process.pid} on port {args.port}")

@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import platform
+import shutil
 import subprocess
 import uuid
 from pathlib import Path
@@ -175,7 +176,11 @@ def offline_uuid(username: str) -> str:
     Without this every launch is a different player: a new inventory, a new spawn, and a `player`
     field on `cmd` that matches nobody it matched last time.
     """
-    digest = bytearray(hashlib.md5(f"OfflinePlayer:{username}".encode("utf-8")).digest())
+    # md5 because that is the algorithm the answer has to match, not because anything here is a
+    # security decision. usedforsecurity=False says so, and keeps this working on a FIPS-mode
+    # interpreter where a plain md5() refuses to run at all.
+    raw = hashlib.md5(f"OfflinePlayer:{username}".encode("utf-8"), usedforsecurity=False)
+    digest = bytearray(raw.digest())
     digest[6] = (digest[6] & 0x0F) | 0x30   # version 3
     digest[8] = (digest[8] & 0x3F) | 0x80   # RFC 4122 variant
     return str(uuid.UUID(bytes=bytes(digest)))
@@ -314,8 +319,14 @@ def verify(command: list[str]) -> list[str]:
     may already have closed. Checking first turns that into one line naming the file.
     """
     problems: list[str] = []
-    if not Path(command[0]).is_file():
-        problems.append(f"java binary not found: {command[0]}")
+    java = command[0]
+    # A bare name is resolved on PATH, not treated as a relative file. `_bundled_java` falls back to
+    # plain "java" when a manifest names no runtime, and --java accepts a command name, so testing
+    # is_file() on those reports "not found" for a java that works perfectly.
+    found = shutil.which(java) if os.path.basename(java) == java else (
+        java if Path(java).is_file() else None)
+    if not found:
+        problems.append(f"java binary not found: {java}")
     for index, argument in enumerate(command):
         if argument == "-cp" and index + 1 < len(command):
             for entry in command[index + 1].split(os.pathsep):
