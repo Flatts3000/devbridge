@@ -130,12 +130,22 @@ only player online.
 timestamped default, chosen inside the capture and never handed back, so the reply carries a message
 and a directory and you are on your own to find it. Name your shots.
 
-**Loading a world turns off pause-on-lost-focus and takes the mouse.** Both are deliberate: a
-singleplayer world pauses half a second after you click away, which stops the integrated server
-ticking, so an unfocused client would answer nothing. Taking the mouse then stops a stray alt-tab
-turning the camera between the command that framed a shot and the shot itself. Opt out per launch
-with `-Ddevbridge.keepTicking=false` or `-Ddevbridge.lockInput=false`, or per session with the
-`pause` and `input` verbs.
+**Loading a world turns off pause-on-lost-focus.** A singleplayer world pauses half a second after
+you click away, which stops the integrated server ticking, so an unfocused client would answer
+nothing. Opt out per launch with `-Ddevbridge.keepTicking=false`, or per session with the `pause`
+verb.
+
+**Your mouse is left alone unless you ask.** With the pause gone, a stray alt-tab can turn the
+camera between the command that framed a shot and the shot itself, so a lock is available:
+`-Ddevbridge.lockInput=true` for a whole run, or `{"verb":"input","enabled":false}` for a moment.
+It is off by default because an automated shoot can ask for it and a person framing a shot by hand
+cannot know to. If you are writing an unattended screenshot loop, turn it on.
+
+A pack has no Gradle run block to put the property in, so `launch` takes `-D` and passes it through:
+
+```bash
+gamebridge launch --instance "$INSTANCE" --port "$PORT" -D devbridge.lockInput=true --wait
+```
 
 ## When it does not work
 

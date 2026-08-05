@@ -62,11 +62,11 @@ runs {
         client()
         systemProperty 'devbridge.port', '<a port you claimed>'
 
-        // Both default to true and only 'false' turns one off.
-        // keepTicking: keep the world running while the window is in the background.
-        // lockInput:   take the mouse on world load so a stray alt-tab cannot move the camera.
+        // Two behaviour switches, with different defaults on purpose.
+        // keepTicking (ON):  keep the world running while the window is in the background.
+        // lockInput  (OFF):  never grab the mouse, so a stray alt-tab cannot move the camera.
         // systemProperty 'devbridge.keepTicking', 'false'
-        // systemProperty 'devbridge.lockInput', 'false'
+        // systemProperty 'devbridge.lockInput', 'true'
 
         // Optional: boot straight into a world instead of stopping at the title screen.
         // NOTE: `--args` on the Gradle task does NOT do this - moddev takes it as a main class.
@@ -111,13 +111,16 @@ next `cmd` would sit in the queue until somebody clicked back into the game, and
 session and leaves nothing behind; press F3+P, send `{"verb":"pause"}`, or start with
 `-Ddevbridge.keepTicking=false` if you want the pause back.
 
-**Loading a world also locks the mouse, because taking the pause away took a safety net with it.** A
-world that keeps ticking in the background is one you can alt-tab into and nudge, and the smallest
-movement turns the camera: a shot your command framed is quietly no longer that shot. The lock just
-leaves the mouse ungrabbed, so moving it over the window does what moving it over any other
-background window does. Menus still take clicks. Hand the mouse back with `{"verb":"input"}` when you
-want to fly around and frame something by eye, and every world load takes it again. Start with
-`-Ddevbridge.lockInput=false` if you would rather it never took it.
+**It does not touch your mouse unless you ask.** Taking the pause away also took away the thing that
+stopped a stray alt-tab turning the camera, so there is a lock available: with it on, the mouse is
+simply never grabbed, and moving it over the window does what moving it over any other background
+window does. Menus still take clicks.
+
+Ask for it per run with `-Ddevbridge.lockInput=true`, or per moment with
+`{"verb":"input","enabled":false}`. It is off by default because of who each default surprises. An
+automated shoot knows it wants the camera held still and can say so; a person who opened the game to
+frame something by eye has no idea a mod took their mouse, and a camera that will not turn reads as
+a broken game rather than a setting.
 
 ## Protocol
 
@@ -125,7 +128,7 @@ One request per line, one reply per line.
 
 | Verb | Runs on | Request fields | Reply |
 |---|---|---|---|
-| `ping` | either | none | `{"ok":true,"protocol":1,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"pauseOnLostFocus":false,"inputLocked":true}` |
+| `ping` | either | none | `{"ok":true,"protocol":1,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"pauseOnLostFocus":false,"inputLocked":false}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
 | `screenshot` | client render thread | optional `name` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |

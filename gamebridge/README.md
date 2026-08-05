@@ -36,6 +36,14 @@ gamebridge launch --instance "C:/.../Instances/Trashlands" --port 8604 --world "
 script can assume a game that is up and compatible. `--dry-run` prints the command line and starts
 nothing, which is the fastest way to see why a launch would fail.
 
+`-D` passes a JVM system property through, repeatable. A pack has no Gradle run block, so this is
+how it reaches the mod's behaviour switches. An unattended screenshot loop probably wants the mouse
+lock, which is off by default:
+
+```
+gamebridge launch --instance "$INSTANCE" --port "$PORT" -D devbridge.lockInput=true --wait
+```
+
 It never writes to `minecraftinstance.json`. Editing that file is a known way to break an instance;
 this only reads it.
 

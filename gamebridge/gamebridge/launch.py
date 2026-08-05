@@ -198,6 +198,7 @@ def build_command(
     install_root: Path | None = None,
     memory_mb: int | None = None,
     java: Path | None = None,
+    properties: list[str] | None = None,
 ) -> list[str]:
     instance = Path(instance)
     root = Path(install_root) if install_root else find_install_root(instance)
@@ -248,6 +249,22 @@ def build_command(
     # The whole point. Set before the main class, because it is a JVM property and not a game
     # argument: devbridge reads it with System.getProperty at mod construction.
     command.append(f"-Ddevbridge.port={port}")
+
+    # Anything else the caller wants set. Without this a pack has no way to reach devbridge's
+    # behaviour switches at all: a mod repo puts them in a Gradle run block, and a pack has no
+    # Gradle, which is the whole reason this command exists.
+    for entry in properties or []:
+        flag = entry if entry.startswith("-D") else f"-D{entry}"
+        # The port is ours, and a second -D for it would win: the JVM takes the last one, so the
+        # game would listen somewhere this command is not watching and --wait would sit there until
+        # it timed out. Refusing beats a confusing silence, in a tool whose recurring failure is
+        # already two things disagreeing about a port.
+        if flag.split("=", 1)[0] == "-Ddevbridge.port":
+            raise LaunchError(
+                f"refusing {flag}: the port is set by --port, and a second one would win and leave "
+                f"the game listening where nothing is watching. Use --port {flag.split('=')[-1]}."
+            )
+        command.append(flag)
 
     command.append(version["mainClass"])
     command += _arguments(version, "game", context, features)

@@ -43,7 +43,16 @@ public class DevBridge {
      */
     public static final String KEEP_TICKING_PROPERTY = "devbridge.keepTicking";
 
-    /** Take the mouse on world load, so a stray hand cannot turn the camera. On unless {@code false}. */
+    /**
+     * Take the mouse on world load, so a stray hand cannot turn the camera. <b>Off</b> unless set to
+     * {@code true}, unlike the other switches.
+     *
+     * <p>It defaults off because of who each default surprises. An unattended run knows it wants the
+     * camera held still and can ask for it, either with this property or with the {@code input}
+     * verb. A person who opened the game to fly around and frame something by eye has no idea a mod
+     * took their mouse, and the symptom - the camera simply not moving - looks like the game is
+     * broken rather than like a setting. A default should favour the case that cannot ask.
+     */
     public static final String LOCK_INPUT_PROPERTY = "devbridge.lockInput";
 
     private static BridgeServer server;
@@ -73,28 +82,34 @@ public class DevBridge {
     /**
      * A behaviour switch, on unless explicitly turned off.
      *
-     * <p>These default to on because they are what makes a client answer at all from outside the
-     * window, so the common case should need no arguments. Unlike {@link #PORT_PROPERTY} they are
-     * ergonomics rather than the security boundary, which is why they are options and the bind
-     * address is not.
+     * <p>Each switch carries its own {@code unset} default rather than sharing one, because the two
+     * answer different questions. Keeping the world ticking is what makes a client answer at all
+     * from outside the window, so it is on and the common case needs no arguments. Taking the mouse
+     * only helps a run that already knows it wants the camera held still, and that run can ask; so
+     * it is off, and a person who did not ask keeps their mouse.
      *
-     * <p>Only {@code false} turns one off. Anything else is a typo that leaves the default in place
-     * and says so, because silently disabling a default on a misspelling is how somebody spends an
+     * <p>Unlike {@link #PORT_PROPERTY} these are ergonomics rather than the security boundary,
+     * which is why they are options at all and the bind address is not.
+     *
+     * <p>Only an exact {@code true} or {@code false} is honoured. Anything else keeps the default
+     * and says so, because silently flipping a switch on a misspelling is how somebody spends an
      * afternoon wondering why their screenshots are of the pause menu.
      */
-    private static boolean flag(String property) {
+    private static boolean flag(String property, boolean unset) {
         String value = System.getProperty(property);
         if (value == null || value.isBlank()) {
-            return true;
+            return unset;
         }
         String trimmed = value.trim();
         if ("false".equalsIgnoreCase(trimmed)) {
             return false;
         }
-        if (!"true".equalsIgnoreCase(trimmed)) {
-            LOGGER.warn("{} is not true or false: '{}'. Leaving it on.", property, value);
+        if ("true".equalsIgnoreCase(trimmed)) {
+            return true;
         }
-        return true;
+        LOGGER.warn("{} is not true or false: '{}'. Leaving it {}.",
+            property, value, unset ? "on" : "off");
+        return unset;
     }
 
     private void onServerStarted(ServerStartedEvent event) {
@@ -103,7 +118,9 @@ public class DevBridge {
         // F3+P or unlocked the mouse in between should not have to work out why the tool went quiet
         // on the next world.
         ClientHandlers.prepareForRemoteControl(
-            event.getServer(), flag(KEEP_TICKING_PROPERTY), flag(LOCK_INPUT_PROPERTY));
+            event.getServer(),
+            flag(KEEP_TICKING_PROPERTY, true),
+            flag(LOCK_INPUT_PROPERTY, false));
 
         if (server != null) {
             return;   // singleplayer opens and closes worlds repeatedly; keep the first socket
