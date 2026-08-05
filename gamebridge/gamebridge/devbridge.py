@@ -129,6 +129,14 @@ class DevBridge:
                     f"A dedicated server has none, and a client older than this check does not send "
                     f"one."
                 )
+            # A directory that does not exist is a typo in the argument, not a wrong game. Saying
+            # "wrong game" there blames the thing that is behaving correctly and sends whoever reads
+            # it looking in the wrong place.
+            if not Path(expect_instance).is_dir():
+                raise DevBridgeError(
+                    f"--expect-instance names a directory that does not exist: {expect_instance}. "
+                    f"The game on port {self.port} is running out of {actual}."
+                )
             if Path(actual).resolve() != Path(expect_instance).resolve():
                 raise DevBridgeError(
                     f"wrong game on port {self.port}: expected {expect_instance}, but this is "
