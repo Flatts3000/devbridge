@@ -332,9 +332,13 @@ def cmd_launch(args) -> int:
     The last manual step in the loop. Everything after this already worked; starting the game was
     the part that needed a person.
     """
-    from .launch import LaunchError, build_command, explain_exit, launch, verify
+    from .launch import LaunchError, build_command, explain_exit, launch, reset_world, verify
 
     instance = Path(args.instance)
+
+    if args.template and not args.world:
+        sys.exit("launch: --template needs --world, to know which world it is replacing")
+
     try:
         command = build_command(
             instance=instance,
@@ -371,6 +375,15 @@ def cmd_launch(args) -> int:
         for problem in problems:
             print(f"launch: {problem}", file=sys.stderr)
         sys.exit("launch: refusing to start with a classpath that does not resolve")
+
+    # The world is replaced only once everything else has passed. Doing it earlier deleted a world
+    # and then failed on the instance path, which is a bad trade for a caller who mistyped a flag.
+    if args.template:
+        try:
+            reset_world(instance, args.world, Path(args.template))
+        except LaunchError as exc:
+            sys.exit(f"launch: {exc}")
+        print(f"launch: reset world {args.world!r} from {args.template}", file=sys.stderr)
 
     started = time.time()
     process = launch(command, instance)
@@ -604,6 +617,9 @@ def main(argv: list[str] | None = None) -> int:
                             "block, so this is how it reaches devbridge.lockInput and friends")
     start.add_argument("--install-root", default=None,
                        help="the CurseForge Install directory, if it is not beside the instance")
+    start.add_argument("--template", default=None, metavar="DIR",
+                       help="replace --world with a copy of this world directory before launching, "
+                            "so every run starts from the same state. REPLACES the existing world")
     start.add_argument("--dry-run", action="store_true",
                        help="print the command line and exit, without starting anything")
     start.add_argument("--wait", action="store_true",
