@@ -358,6 +358,50 @@ def verify(command: list[str]) -> list[str]:
     return problems
 
 
+def reset_world(instance: Path, world: str, template: Path) -> None:
+    """Replace a world with a copy of a template, so every run starts from the same state.
+
+    **This deletes a directory**, so it checks three things first: that the template looks like a
+    world, that it is not inside the saves folder it would be copied into, and that the destination
+    is a direct child of saves rather than somewhere a crafted world name could point. A world name
+    is caller-supplied text about to be turned into a delete, which is worth being dull about.
+
+    Not "from a seed", which is what the issue asked for. In 26.1.2 the seed is not in `level.dat` -
+    there is no `seed` key and no `WorldGenSettings` - so authoring a world from one means finding
+    and writing whatever replaced it, in a zero-dependency package with no NBT library. A template
+    committed next to the scripts that use it gets the reproducibility without that.
+    """
+    template = Path(template)
+    if not (template / "level.dat").is_file():
+        raise LaunchError(f"{template} has no level.dat, so it is not a world template")
+
+    saves = (instance / "saves").resolve()
+    target = (saves / world).resolve()
+    if target.parent != saves:
+        raise LaunchError(f"world name {world!r} does not name a direct child of {saves}")
+    if template.resolve() == target or template.resolve() in target.parents:
+        raise LaunchError("the template is the world it would be replaced with")
+
+    if target.exists():
+        if (target / "session.lock").exists() and _locked(target / "session.lock"):
+            raise LaunchError(f"{target} is in use by a running game; stop it first")
+        shutil.rmtree(target)
+    shutil.copytree(template, target)
+
+
+def _locked(lock: Path) -> bool:
+    """Whether a running game still holds this world.
+
+    Opening the lock for append fails on Windows while the game has it, which is the same signal the
+    game itself uses. On other platforms this is advisory and returns False.
+    """
+    try:
+        with lock.open("a"):
+            return False
+    except OSError:
+        return True
+
+
 def explain_exit(instance: Path, since: float) -> list[str]:
     """Why the game died, from what it left behind.
 
