@@ -345,11 +345,11 @@ def cmd_launch(args) -> int:
         #
         # Quoted the way the platform would, so a world name with a space in it reads as one
         # argument. The real launch passes a list and never goes near a shell.
-        if os.name == "nt":
-            print(subprocess.list2cmdline(command))
-        else:
-            print(shlex.join(command))
-        for problem in verify(command):
+        rendered = (subprocess.list2cmdline(command) if os.name == "nt"
+                    else shlex.join(command))
+        problems = verify(command)
+        emit(args, {"command": command, "rendered": rendered, "problems": problems}, rendered)
+        for problem in problems:
             print(f"launch: {problem}", file=sys.stderr)
         return 0
 
@@ -361,17 +361,22 @@ def cmd_launch(args) -> int:
 
     started = time.time()
     process = launch(command, instance)
-    emit(args, {"pid": process.pid, "port": args.port},
-         f"launched pid {process.pid} on port {args.port}")
-
+    started_info = {"pid": process.pid, "port": args.port}
     if not args.wait:
+        emit(args, started_info, f"launched pid {process.pid} on port {args.port}")
         return 0
+    # Under --json the launch line is held back and folded into the single object emitted below.
+    # Two documents on one stdout is not JSON, and a caller doing json.load() gets a parse error
+    # from the second one rather than the answer it asked for.
+    if not getattr(args, "json", False):
+        print(f"launched pid {process.pid} on port {args.port}")
 
     # Poll the socket rather than the process: a live pid means java started, not that the mod is
     # listening, and the gap between them is most of a minute.
     deadline = time.monotonic() + args.for_seconds
     while time.monotonic() < deadline:
         if process.poll() is not None:
+            emit(args, {**started_info, "up": False, "exitCode": process.returncode})
             print(f"launch: the game exited with code {process.returncode} before answering",
                   file=sys.stderr)
             # The tool already knows why. Making the caller go and find the crash report is the
@@ -388,10 +393,12 @@ def cmd_launch(args) -> int:
         try:
             with DevBridge(port=args.port, timeout=5.0) as bridge:
                 reply = bridge.ping()
-            emit(args, reply, f"up: {reply.get('side')}, protocol {reply.get('protocol')}")
+            emit(args, {**started_info, "up": True, **reply},
+                 f"up: {reply.get('side')}, protocol {reply.get('protocol')}")
             return 0
         except (OSError, DevBridgeError):
             time.sleep(3.0)
+    emit(args, {**started_info, "up": False, "timedOut": True})
     print(f"launch: no answer on {args.port} within {args.for_seconds:g}s", file=sys.stderr)
     return 1
 
