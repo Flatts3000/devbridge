@@ -26,6 +26,20 @@ import net.minecraft.server.level.ServerPlayer;
  */
 final class Handlers {
 
+    /**
+     * The wire protocol's version, reported by {@code ping}.
+     *
+     * <p>Bump this when a change would make an older client wrong rather than merely unaware: a verb
+     * or field that is renamed, removed, or changes meaning. Adding a verb or a reply field does not
+     * count, because a client that has never heard of it carries on working.
+     *
+     * <p>The client keeps the same number in {@code gamebridge/gamebridge/devbridge.py} and
+     * {@code check_invariants.sh} fails the build if the two drift. That check is the reason the
+     * client lives in this repo: before it did, three verbs and two ping fields were added here with
+     * nothing to notice that the client could not speak them.
+     */
+    static final int PROTOCOL_VERSION = 1;
+
     private Handlers() {
     }
 
@@ -65,6 +79,7 @@ final class Handlers {
 
     private static JsonObject ping(MinecraftServer server) {
         JsonObject reply = ok();
+        reply.addProperty("protocol", PROTOCOL_VERSION);
         reply.addProperty("side", server.isDedicatedServer() ? "dedicated" : "integrated");
         reply.addProperty("mcVersion", SharedConstants.getCurrentVersion().name());
         reply.addProperty("hasClient", ClientHandlers.available(server));

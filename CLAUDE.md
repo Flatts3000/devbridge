@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 a running Minecraft instance over a loopback socket. Run commands, take screenshots, read the answers.
 Mod id / package: `devbridge` / `dev.mcbridge.devbridge`.
 
+**Two halves, one protocol.** `src/` is the mod; `gamebridge/` is the Python CLI that talks to it.
+They live together because a split repo let three verbs and two `ping` fields ship with no client
+able to speak them. `Handlers.PROTOCOL_VERSION` and `gamebridge/gamebridge/devbridge.py`'s
+`PROTOCOL_VERSION` must match, and `check_invariants.sh` fails the build when they drift. Bump it
+only when a verb or field is renamed, removed, or changes meaning - adding either is backwards
+compatible, because a client that has never heard of a new verb keeps working.
+
+**Only one of the two artefacts is installable.** The jar is never published anywhere; the Python
+package is meant to be `pip install`ed. Keep that distinction loud in anything user-facing.
+
 **It exists because RCON cannot reach a singleplayer world and cannot take a screenshot.** Both are
 structural: an integrated server listens on nothing, and a dedicated server has no framebuffer. Where
 RCON does work it stays the better answer.

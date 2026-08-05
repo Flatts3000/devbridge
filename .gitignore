@@ -2,3 +2,10 @@
 build/
 run/
 *.class
+
+# gamebridge, the Python client
+__pycache__/
+*.egg-info/
+*.pyc
+.ruff_cache/
+.venv/
