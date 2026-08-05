@@ -62,4 +62,15 @@ final class ClientOptions {
     static boolean pausesOnLostFocus() {
         return Minecraft.getInstance().options.pauseOnLostFocus;
     }
+
+    /**
+     * Which directory this client is running out of, for {@code ping}.
+     *
+     * <p>The instance root, so it names the pack or dev run rather than a world inside it. This is
+     * the field that distinguishes two clients of the same Minecraft version, which nothing else in
+     * the reply does.
+     */
+    static String gameDirectory() {
+        return Minecraft.getInstance().gameDirectory.toPath().toAbsolutePath().toString();
+    }
 }

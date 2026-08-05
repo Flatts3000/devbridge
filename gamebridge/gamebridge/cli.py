@@ -197,8 +197,9 @@ def cmd_ping(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: ping is a devbridge verb; use `wait` for RCON")
     with connect(args) as bridge:
-        reply = bridge.ping()
-    for key in ("protocol", "side", "mcVersion", "hasClient", "pauseOnLostFocus", "inputLocked"):
+        reply = bridge.ping(expect_instance=args.expect_instance)
+    for key in ("protocol", "side", "mcVersion", "hasClient", "worldName", "mods",
+                "gameDir", "pauseOnLostFocus", "inputLocked"):
         if key in reply:
             print(f"{key}: {reply[key]}")
     return 0
@@ -363,6 +364,9 @@ def main(argv: list[str] | None = None) -> int:
     pause.set_defaults(func=cmd_pause)
 
     ping = subs.add_parser("ping", help="handshake and protocol check (devbridge only)")
+    ping.add_argument("--expect-instance", default=None, metavar="DIR",
+                      help="fail unless the game is running out of this directory. Two clients of "
+                           "one Minecraft version are otherwise indistinguishable")
     ping.set_defaults(func=cmd_ping)
 
     halt = subs.add_parser("stop", help="close the world and quit the game (devbridge only)")
