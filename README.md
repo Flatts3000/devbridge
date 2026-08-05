@@ -137,7 +137,7 @@ One request per line, one reply per line.
 | `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270}` |
 | `cursor` | client render thread | `x`, `y` (GUI-scaled) | `{"ok":true,"x":167,"y":144,"rawX":668,"rawY":576}` |
 | `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"handled":true}` |
-| `stop` | either | none | Closes the world. On a client this returns to the title screen; it does not quit the process |
+| `stop` | either | none | `{"ok":true,"quits":true}` - closes the world, and on a client quits the game |
 
 `protocol` is the wire protocol's version, and `gamebridge` refuses to talk to a mod whose number it
 does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning:

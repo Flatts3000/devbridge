@@ -140,9 +140,30 @@ final class Handlers {
     }
 
     private static JsonObject stop(MinecraftServer server) {
+        boolean hasClient = ClientHandlers.available(server);
         JsonObject reply = ok();
-        // Queued rather than called, so the reply is written before the world starts closing.
-        server.execute(() -> server.halt(false));
+        reply.addProperty("quits", hasClient);
+
+        // Queued rather than called, so the reply is written before anything starts closing.
+        //
+        // ON A CLIENT THIS MUST QUIT THE GAME, not just halt the server. Halting alone leaves the
+        // client at the title screen still holding the world's file locks, so the next launch fails
+        // with "another process has locked a portion of the file" - which reads as a corrupt save
+        // rather than as a process nobody shut down, two runs later and nowhere near the cause.
+        //
+        // halt() first, then quit. halt(false) does not block, so it hands the server thread its own
+        // shutdown - which is what saves the world - while the client is still alive to run it. The
+        // client's run loop only ends after that work drains. Verified by stopping a world with a
+        // block placed in it and finding the block still there on the next launch; the ordering is
+        // load-bearing rather than incidental.
+        if (hasClient) {
+            server.execute(() -> {
+                server.halt(false);
+                ClientHandlers.quit();
+            });
+        } else {
+            server.execute(() -> server.halt(false));
+        }
         return reply;
     }
 

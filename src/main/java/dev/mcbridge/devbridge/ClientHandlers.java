@@ -47,6 +47,11 @@ final class ClientHandlers {
         return ScreenshotTaker.take(name, width, height);
     }
 
+    /** Quit the game entirely. Only call after {@link #available} has passed. */
+    static void quit() {
+        ClientOptions.quit();
+    }
+
     static JsonObject hud(MinecraftServer server, boolean show) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: the HUD is a client thing");
