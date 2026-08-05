@@ -12,6 +12,14 @@ pip install "gamebridge @ git+https://github.com/Flatts3000/devbridge.git#subdir
 
 Stdlib only, no dependencies.
 
+`--version` reports the package version and the wire protocol it speaks. `--json` makes any command
+print its reply object instead of a sentence, which is what a script or an agent should be reading:
+
+```
+$ gamebridge --json --devbridge $PORT ping
+{"ok": true, "protocol": 1, "side": "integrated", "worldName": "New World", ...}
+```
+
 ```
 gamebridge wait                                       block until the server accepts RCON
 gamebridge cmd "function recompile:showcase/museum"   run one command

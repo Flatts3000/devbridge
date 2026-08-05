@@ -143,10 +143,14 @@ failure deep inside a mod usually prints nothing, so an unattended run reports a
 scene that is not there. Bracket the run instead:
 
 ```bash
-MARK=$(gamebridge --devbridge "$PORT" log --level ERROR 2>&1 >/dev/null | grep -oE 'marker [0-9]+' | cut -d' ' -f2)
+MARK=$(gamebridge --json --devbridge "$PORT" log --level ERROR | python -c "import json,sys; print(json.load(sys.stdin)['marker'])")
 gamebridge --devbridge "$PORT" --player @s cmd "function yourpack:showcase/hall"
 gamebridge --devbridge "$PORT" log --since "$MARK" --level ERROR --fail-on-error
 ```
+
+**`--json` is the surface to script against.** Every command takes it, and it prints the reply object
+instead of a sentence. Sentences here get reworded whenever one turns out not to say what actually
+went wrong, and a caller matching on them breaks when that happens.
 
 It reads the log file rather than asking the game, so it also works on a game that has already
 died - which is exactly when you most want it.
