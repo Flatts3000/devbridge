@@ -116,9 +116,9 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `hud` | Show or hide the HUD |
 | `input` | Hand the mouse back, or take it |
 | `pause` | Restore pausing on lost focus, or turn it off |
-| `screen` | What GUI is open, or open the inventory / close what is open |
+| `screen` | What GUI is open, what widgets are in it and where to click each, or open the inventory / close what is open |
 | `cursor` | Move the pointer, which is what makes a tooltip render |
-| `click` | Press and release at a point. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
+| `click` | Press and release at a point, or on `--text NAME` from the widget list. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
 | `probe` | Block entity data at a position, or `--is` to test what block it is |
 | `ps` | What has been launched, and whether it is still running |
 | `log` | What the game logged since a marker, so a silent failure stops being silent |
@@ -176,10 +176,38 @@ open screen's width and height in GUI-scaled units, which is the space `cursor` 
 at GUI scale 4 they are a quarter of the window's pixels. Point first, then shoot:
 
 ```bash
-gamebridge --devbridge "$PORT" screen --open      # the inventory
+gamebridge --devbridge "$PORT" screen open        # the inventory
 gamebridge --devbridge "$PORT" cursor 167 144     # a tooltip renders under the pointer
 gamebridge --devbridge "$PORT" shot quest_tooltip
 ```
+
+**Do not work out where to click. Ask.** `screen` lists the widgets it can see, with a click point
+for each:
+
+```
+$ gamebridge --devbridge "$PORT" screen
+screen: net.minecraft.client.gui.screens.DeathScreen
+title: You Died!
+width: 427
+height: 240
+widgets: 2 placed
+        click       size  state     what
+    213,142     200x20    -         'Respawn' (Button.Plain)
+    213,166     200x20    -         'Title Screen' (Button.Plain)
+
+$ gamebridge --devbridge "$PORT" click --text Respawn
+'Respawn' (Button.Plain) at 213,142
+click sent (press, release); verify with screen or shot
+```
+
+`--text` matches case-insensitively, takes a unique substring, and refuses rather than guessing when
+two widgets match. Prefer it to a coordinate every time: a coordinate is arithmetic about somebody
+else's layout, and it breaks silently - on a resize, a GUI scale change, or the mod moving the
+button, it does not fail, it clicks whatever moved into that spot.
+
+A screen that draws without widgets reports an empty list, which is the honest answer and still more
+than the old silence. `LIST TRUNCATED` means the depth or size cap cut the walk short, so a missing
+button may be there after all.
 
 Do not pass `--width/--height` to a GUI shot. Resizing re-lays-out the screen and changes the GUI
 scale, so the coordinates you just pointed at are no longer the same place.

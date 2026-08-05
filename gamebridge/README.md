@@ -27,7 +27,13 @@ gamebridge script scene.mcfunction                    run a file, a command per 
 gamebridge probe 2 121 2                              what block entity data is at a position
 gamebridge check "block 6 125 0 recompile:corrugated_metal"
 gamebridge check "entity @e[type=minecraft:painting]" --count 6
+gamebridge screen                                     what GUI is open and what is in it
+gamebridge click --text Respawn                       press a widget by its label
 ```
+
+`screen` lists the open screen's widgets with a click point for each, and `click --text` uses it, so
+driving a GUI does not mean computing coordinates from somebody else's layout. A coordinate breaks
+silently when anything moves - it clicks whatever is there now; a label does not.
 
 ## Starting the game
 

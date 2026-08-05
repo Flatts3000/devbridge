@@ -219,7 +219,48 @@ def cmd_screen(args) -> int:
         for key in ("screen", "title", "width", "height"):
             if key in reply:
                 print(f"{key}: {reply[key]}")
+        print_widgets(reply)
     return 0
+
+
+def print_widgets(reply: dict) -> None:
+    """The widget table, which is the part a caller acts on.
+
+    Only widgets that can be clicked are worth tabulating, so entries with no bounds are counted
+    rather than listed: they are layout wrappers and invisible holders, and printing forty of them
+    buries the three buttons.
+    """
+    widgets = reply.get("widgets")
+    if widgets is None:
+        # Only the reporting path lists widgets. `screen open` and `screen close` answer with what
+        # they did, and saying the mod is old there would be a lie about a reply that never carried
+        # widgets. The width is what distinguishes the two replies.
+        if reply.get("screen") and "width" in reply:
+            print("widgets: not reported by this mod build (it predates widget listing)")
+        return
+    placed = [w for w in widgets if w.get("width")]
+    if not placed:
+        if widgets:
+            print(f"widgets: {len(widgets)} present, none reporting bounds "
+                  f"(a screen that draws without widgets)")
+        elif reply.get("screen"):
+            print("widgets: none")
+        return
+
+    print(f"widgets: {len(placed)} placed"
+          + (f", {len(widgets) - len(placed)} without bounds" if len(widgets) > len(placed) else "")
+          + ("" if reply.get("widgetsComplete", True) else ", LIST TRUNCATED"))
+    print(f"  {'click':>11}  {'size':>9}  {'state':<8}  what")
+    for w in placed:
+        state = "".join((
+            "" if w.get("active", True) else "off ",
+            "hidden " if not w.get("visible", True) else "",
+            "focus " if w.get("focused") else "",
+        )).strip() or "-"
+        text = w.get("text") or ""
+        label = f"{text!r} ({w['type']})" if text else w["type"]
+        print(f"  {w['centerX']:>5},{w['centerY']:<5}  {w['width']:>4}x{w['height']:<4}  "
+              f"{state:<8}  {'  ' * w.get('depth', 0)}{label}")
 
 
 def cmd_cursor(args) -> int:
@@ -233,12 +274,60 @@ def cmd_cursor(args) -> int:
     return 0
 
 
+def find_widget(bridge, text: str) -> dict:
+    """The one widget whose label matches, or an exit explaining which it could have been.
+
+    Exact match wins outright, so a screen carrying both `Save` and `Save and Quit` is still
+    addressable by the shorter name. Otherwise the substring must be unique: clicking an arbitrary
+    one of several matches is how a script silently does the wrong thing for a week.
+    """
+    reply = bridge.screen()
+    if "widgets" not in reply:
+        sys.exit("--text needs a mod build that lists widgets; this one does not report them. "
+                 "Rebuild and reinstall the jar, or pass coordinates")
+    if not reply.get("screen"):
+        sys.exit("no screen is open, so there is nothing to click")
+
+    wanted = text.casefold()
+    placed = [w for w in reply["widgets"] if w.get("width") and (w.get("text") or "")]
+    exact = [w for w in placed if w["text"].casefold() == wanted]
+    hits = exact or [w for w in placed if wanted in w["text"].casefold()]
+
+    if not hits:
+        known = ", ".join(sorted({repr(w["text"]) for w in placed})) or "none"
+        truncated = "" if reply.get("widgetsComplete", True) else " (and the list was truncated)"
+        sys.exit(f"no widget labelled {text!r} on {reply['screen'].split('.')[-1]}{truncated}. "
+                 f"Labelled and clickable: {known}")
+    if len(hits) > 1:
+        names = ", ".join(repr(w["text"]) for w in hits)
+        sys.exit(f"{text!r} matches {len(hits)} widgets: {names}. Use a longer substring or "
+                 f"coordinates")
+    return hits[0]
+
+
 def cmd_click(args) -> int:
-    """Press and release at a point. Non-zero if nothing took the click."""
+    """Press and release at a point, or on a named widget. Non-zero only if the request failed."""
     if args.devbridge is None:
         sys.exit("--devbridge required: clicking is a client thing")
+    if (args.x is None) == (args.text is None):
+        sys.exit("click takes either x and y, or --text, and needs one of them")
+    if args.text is None and args.y is None:
+        sys.exit("click needs both x and y")
+
     with connect(args) as bridge:
+        widget = None
+        if args.text is not None:
+            widget = find_widget(bridge, args.text)
+            args.x, args.y = widget["centerX"], widget["centerY"]
+            if not getattr(args, "json", False):
+                print(f"{widget['text']!r} ({widget['type']}) at {args.x},{args.y}"
+                      + ("" if widget.get("active", True) else " - INACTIVE, it may ignore this"))
         reply = bridge.click(args.x, args.y, args.button)
+        if widget is not None:
+            # What a label resolved to, in the reply rather than only in the printed line. A --json
+            # caller otherwise has no record of which widget it hit, which is the one thing worth
+            # keeping from a run that clicked the wrong thing.
+            reply["widget"] = widget
     # ALWAYS 0 when the request itself succeeded. Nothing this verb learns synchronously is a
     # verdict: the booleans over-report (a creative inventory answers clicks on empty background)
     # and under-report (an FTB Quests tab switches chapters returning false), and even a screen
@@ -597,9 +686,13 @@ def main(argv: list[str] | None = None) -> int:
     cur.add_argument("y", type=float)
     cur.set_defaults(func=cmd_cursor)
 
-    clk = subs.add_parser("click", help="press and release at a point")
-    clk.add_argument("x", type=float)
-    clk.add_argument("y", type=float)
+    clk = subs.add_parser("click", help="press and release at a point, or on a named widget")
+    clk.add_argument("x", type=float, nargs="?", default=None)
+    clk.add_argument("y", type=float, nargs="?", default=None)
+    clk.add_argument("--text", default=None, metavar="LABEL",
+                     help="click the centre of the widget with this label instead of a coordinate. "
+                          "Case-insensitive, and a unique substring is enough. Survives a resize or "
+                          "a GUI scale change, which a coordinate does not")
     clk.add_argument("--button", type=int, default=0, help="0 left, 1 right, 2 middle")
     clk.set_defaults(func=cmd_click)
 
