@@ -1,20 +1,24 @@
-"""`gamebridge` - run commands against a Minecraft dev server and read what it says back.
+"""`gamebridge` - drive a running Minecraft instance from outside.
 
-    gamebridge wait                      block until the server is accepting RCON
-    gamebridge cmd "time set noon"       run one command, print the output
-    gamebridge script scene.mcfunction   run a file, one command per line
-    gamebridge probe 10 64 10            what block is at these coordinates
-    gamebridge check "entity @e[type=minecraft:painting]" --count 6
+    gamebridge --devbridge $PORT ping             handshake: which game, which protocol
+    gamebridge --devbridge $PORT --player @s cmd "time set noon"
+    gamebridge --devbridge $PORT shot museum      screenshot, written before the reply
+    gamebridge --devbridge $PORT log --level ERROR   has anything thrown
+    gamebridge launch --instance DIR --port $PORT --world NAME --wait
 
-Two transports, same verbs. RCON reaches a dedicated server and is the default. The devbridge mod runs
-inside the game and is the only way to reach a SINGLEPLAYER world or to take a screenshot:
+**Options go before the subcommand.** `--devbridge`, `--player` and `--timeout` belong to the tool
+rather than to the verb, so `cmd "..." --player @s` is an "unrecognized arguments" error and
+`--player @s cmd "..."` is right.
 
-    gamebridge --devbridge $PORT cmd "function recompile:showcase/museum"
-    gamebridge --devbridge $PORT shot museum
+Two transports, same verbs. RCON reaches a dedicated server and is the default; its settings come
+from the server's own `server.properties`, found by walking up from the working directory. The
+devbridge mod runs inside the game and is the only way to reach a SINGLEPLAYER world, take a
+screenshot, or drive a GUI.
 
-Connection settings come from the server's own `server.properties`, found by walking up from the
-working directory, so there is nothing to configure and no password to keep in sync. Override with
-`--host`, `--port`, `--password` or `--properties`.
+Claim a port per project rather than copying one: there is no default anywhere, and two projects on
+one socket is how a verifier reports a clean pass about the wrong world.
+
+Full guide: https://github.com/Flatts3000/devbridge/blob/main/docs/onboarding.md
 """
 
 from __future__ import annotations
@@ -27,8 +31,21 @@ import sys
 import time
 from pathlib import Path
 
-from .devbridge import DevBridge, DevBridgeError
+from .devbridge import PROTOCOL_VERSION, DevBridge, DevBridgeError
 from .rcon import Rcon, RconError
+
+
+def _version() -> str:
+    """The installed package's version, or a marker when running from a source tree.
+
+    Read from installed metadata rather than a constant, so it cannot drift from pyproject.toml -
+    which is the same failure the protocol check exists to prevent, one layer up.
+    """
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+        return version("gamebridge")
+    except Exception:
+        return "unknown (not installed)"
 
 
 def find_properties(start: Path | None = None) -> Path | None:
@@ -389,6 +406,11 @@ def cmd_check(args) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gamebridge", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    # A tool that cannot say what it is cannot be told apart from an older copy, which is the same
+    # class of problem the protocol version exists for. The protocol number is here too because it,
+    # not the package version, is what has to match the mod.
+    parser.add_argument("--version", action="version",
+                        version=f"gamebridge {_version()} (wire protocol {PROTOCOL_VERSION})")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--password", default=None)

@@ -26,7 +26,7 @@ RCON does work it stays the better answer.
 JAVA_HOME="/c/Program Files/Java/jdk-25" ./gradlew build
 ```
 
-Java 25 toolchain, NeoForge moddev plugin. Output is `build/libs/devbridge-26.1.2-0.1.0.jar`
+Java 25 toolchain, NeoForge moddev plugin. Output is `build/libs/devbridge-26.1.2-<mod_version>.jar`
 (`archivesName` is `<mod_id>-<minecraft_version>`, version appended). There are no tests and no lint
 task, so `build` means compile plus jar.
 
