@@ -127,11 +127,27 @@ final class ScreenDriver {
             out.add(describe(child, depth));
             if (depth + 1 < MAX_DEPTH) {
                 complete &= collect(child, out, depth + 1);
-            } else if (child instanceof ContainerEventHandler nested && !nested.children().isEmpty()) {
+            } else if (hasChildren(child)) {
                 complete = false;
             }
         }
         return complete;
+    }
+
+    /**
+     * Whether the depth limit is cutting something off, asked at the edge of the walk.
+     *
+     * <p>Guarded for the same reason every other call into a widget is: this is the one place that
+     * touches mod code outside {@link #describe}, and an unguarded {@code children()} that threw here
+     * would fail the whole verb to answer a question only used to set a flag. Unreachable is reported
+     * as cut off, because that is the truthful direction to be wrong in.
+     */
+    private static boolean hasChildren(GuiEventListener child) {
+        try {
+            return child instanceof ContainerEventHandler nested && !nested.children().isEmpty();
+        } catch (Throwable t) {
+            return true;
+        }
     }
 
     /**

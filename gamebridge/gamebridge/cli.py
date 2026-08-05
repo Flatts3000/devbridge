@@ -315,13 +315,19 @@ def cmd_click(args) -> int:
         sys.exit("click needs both x and y")
 
     with connect(args) as bridge:
+        widget = None
         if args.text is not None:
             widget = find_widget(bridge, args.text)
             args.x, args.y = widget["centerX"], widget["centerY"]
-            if not args.json:
+            if not getattr(args, "json", False):
                 print(f"{widget['text']!r} ({widget['type']}) at {args.x},{args.y}"
                       + ("" if widget.get("active", True) else " - INACTIVE, it may ignore this"))
         reply = bridge.click(args.x, args.y, args.button)
+        if widget is not None:
+            # What a label resolved to, in the reply rather than only in the printed line. A --json
+            # caller otherwise has no record of which widget it hit, which is the one thing worth
+            # keeping from a run that clicked the wrong thing.
+            reply["widget"] = widget
     # ALWAYS 0 when the request itself succeeded. Nothing this verb learns synchronously is a
     # verdict: the booleans over-report (a creative inventory answers clicks on empty background)
     # and under-report (an FTB Quests tab switches chapters returning false), and even a screen
