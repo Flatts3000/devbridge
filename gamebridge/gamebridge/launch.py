@@ -254,7 +254,17 @@ def build_command(
     # behaviour switches at all: a mod repo puts them in a Gradle run block, and a pack has no
     # Gradle, which is the whole reason this command exists.
     for entry in properties or []:
-        command.append(entry if entry.startswith("-D") else f"-D{entry}")
+        flag = entry if entry.startswith("-D") else f"-D{entry}"
+        # The port is ours, and a second -D for it would win: the JVM takes the last one, so the
+        # game would listen somewhere this command is not watching and --wait would sit there until
+        # it timed out. Refusing beats a confusing silence, in a tool whose recurring failure is
+        # already two things disagreeing about a port.
+        if flag.split("=", 1)[0] == "-Ddevbridge.port":
+            raise LaunchError(
+                f"refusing {flag}: the port is set by --port, and a second one would win and leave "
+                f"the game listening where nothing is watching. Use --port {flag.split('=')[-1]}."
+            )
+        command.append(flag)
 
     command.append(version["mainClass"])
     command += _arguments(version, "game", context, features)
