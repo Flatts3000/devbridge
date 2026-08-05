@@ -98,7 +98,7 @@ fi
 #
 # Adding a client-only class means adding it here, on purpose.
 # ---------------------------------------------------------------------------
-client_only="ScreenshotTaker.java ClientOptions.java InputLock.java"
+client_only="ScreenshotTaker.java ClientOptions.java InputLock.java ScreenDriver.java"
 for f in $(find "$src" -name '*.java'); do
     case " $client_only " in
         *" $(basename "$f") "*) continue ;;
@@ -107,6 +107,7 @@ for f in $(find "$src" -name '*.java'); do
         -e 'net\.minecraft\.client' \
         -e 'net\.neoforged\.neoforge\.client' \
         -e 'com\.mojang\.blaze3d' \
+        -e 'org\.lwjgl' \
         "$f" | code_only)
     if [ -n "$offenders" ]; then
         echo "$offenders" >&2

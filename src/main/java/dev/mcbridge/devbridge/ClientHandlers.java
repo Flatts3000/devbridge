@@ -61,6 +61,28 @@ final class ClientHandlers {
         return InputLock.set(enabled);
     }
 
+    static JsonObject screen(MinecraftServer server, Boolean open) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: there are no screens on a server");
+        }
+        return open == null ? ScreenDriver.describe() : ScreenDriver.set(open);
+    }
+
+    static JsonObject cursor(MinecraftServer server, double x, double y) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: there is no pointer to move");
+        }
+        return ScreenDriver.cursor(x, y);
+    }
+
+    static JsonObject click(MinecraftServer server, double x, double y, int button)
+            throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: there is nothing to click");
+        }
+        return ScreenDriver.click(x, y, button);
+    }
+
     static JsonObject pause(MinecraftServer server, boolean enabled) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: a dedicated server has no window to "

@@ -116,6 +116,9 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `hud` | Show or hide the HUD |
 | `input` | Hand the mouse back, or take it |
 | `pause` | Restore pausing on lost focus, or turn it off |
+| `screen` | What GUI is open, or open the inventory / close what is open |
+| `cursor` | Move the pointer, which is what makes a tooltip render |
+| `click` | Press and release at a point |
 | `log` | What the game logged since a marker, so a silent failure stops being silent |
 | `stop` | Close the world and quit |
 
@@ -147,6 +150,19 @@ gamebridge --devbridge "$PORT" log --since "$MARK" --level ERROR --fail-on-error
 
 It reads the log file rather than asking the game, so it also works on a game that has already
 died - which is exactly when you most want it.
+
+**Photographing a GUI takes two steps, and the coordinates are not pixels.** `screen` reports the
+open screen's width and height in GUI-scaled units, which is the space `cursor` and `click` work in;
+at GUI scale 4 they are a quarter of the window's pixels. Point first, then shoot:
+
+```bash
+gamebridge --devbridge "$PORT" screen --open      # the inventory
+gamebridge --devbridge "$PORT" cursor 167 144     # a tooltip renders under the pointer
+gamebridge --devbridge "$PORT" shot quest_tooltip
+```
+
+Do not pass `--width/--height` to a GUI shot. Resizing re-lays-out the screen and changes the GUI
+scale, so the coordinates you just pointed at are no longer the same place.
 
 **A gallery wants consistent dimensions.** `shot --width 1920 --height 1080` captures at exactly
 that size whatever the window is, by resizing it for the moment of the capture and putting it back.

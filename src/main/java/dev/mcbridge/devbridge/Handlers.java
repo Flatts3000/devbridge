@@ -57,6 +57,13 @@ final class Handlers {
                 !request.has("enabled") || request.get("enabled").getAsBoolean());
             case "pause" -> ClientHandlers.pause(server,
                 !request.has("enabled") || request.get("enabled").getAsBoolean());
+            case "screen" -> ClientHandlers.screen(server,
+                request.has("open") ? request.get("open").getAsBoolean() : null);
+            case "cursor" -> ClientHandlers.cursor(server,
+                request.get("x").getAsDouble(), request.get("y").getAsDouble());
+            case "click" -> ClientHandlers.click(server,
+                request.get("x").getAsDouble(), request.get("y").getAsDouble(),
+                request.has("button") ? request.get("button").getAsInt() : 0);
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a
             // tool whose entire job is reporting what happened.
