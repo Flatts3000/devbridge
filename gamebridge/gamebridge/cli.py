@@ -20,6 +20,9 @@ working directory, so there is nothing to configure and no password to keep in s
 from __future__ import annotations
 
 import argparse
+import os
+import shlex
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -186,6 +189,74 @@ def cmd_ping(args) -> int:
     return 0
 
 
+def cmd_launch(args) -> int:
+    """Start an instance with devbridge switched on, and optionally wait for it to answer.
+
+    The last manual step in the loop. Everything after this already worked; starting the game was
+    the part that needed a person.
+    """
+    from .launch import LaunchError, build_command, launch, verify
+
+    instance = Path(args.instance)
+    try:
+        command = build_command(
+            instance=instance,
+            port=args.port,
+            world=args.world,
+            username=args.username,
+            width=args.width,
+            height=args.height,
+            install_root=Path(args.install_root) if args.install_root else None,
+            memory_mb=args.memory,
+            java=Path(args.java) if args.java else None,
+        )
+    except LaunchError as exc:
+        sys.exit(f"launch: {exc}")
+
+    if args.dry_run:
+        # Printed before the checks, and printed even when they fail. --dry-run exists to show why a
+        # launch would not work, and withholding the command line in exactly the case somebody is
+        # debugging is the wrong way round.
+        #
+        # Quoted the way the platform would, so a world name with a space in it reads as one
+        # argument. The real launch passes a list and never goes near a shell.
+        if os.name == "nt":
+            print(subprocess.list2cmdline(command))
+        else:
+            print(shlex.join(command))
+        for problem in verify(command):
+            print(f"launch: {problem}", file=sys.stderr)
+        return 0
+
+    problems = verify(command)
+    if problems:
+        for problem in problems:
+            print(f"launch: {problem}", file=sys.stderr)
+        sys.exit("launch: refusing to start with a classpath that does not resolve")
+
+    process = launch(command, instance)
+    print(f"launched pid {process.pid} on port {args.port}")
+
+    if not args.wait:
+        return 0
+
+    # Poll the socket rather than the process: a live pid means java started, not that the mod is
+    # listening, and the gap between them is most of a minute.
+    deadline = time.monotonic() + args.for_seconds
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            sys.exit(f"launch: the game exited with code {process.returncode} before answering")
+        try:
+            with DevBridge(port=args.port, timeout=5.0) as bridge:
+                reply = bridge.ping()
+            print(f"up: {reply.get('side')}, protocol {reply.get('protocol')}")
+            return 0
+        except (OSError, DevBridgeError):
+            time.sleep(3.0)
+    print(f"launch: no answer on {args.port} within {args.for_seconds:g}s", file=sys.stderr)
+    return 1
+
+
 def cmd_probe(args) -> int:
     """What is actually at a position.
 
@@ -277,6 +348,33 @@ def main(argv: list[str] | None = None) -> int:
 
     ping = subs.add_parser("ping", help="handshake and protocol check (devbridge only)")
     ping.set_defaults(func=cmd_ping)
+
+    start = subs.add_parser("launch", help="start a CurseForge instance with devbridge enabled")
+    start.add_argument("--instance", required=True, metavar="DIR",
+                       help="the instance directory, the one holding minecraftinstance.json")
+    start.add_argument("--port", type=int, required=True,
+                       help="devbridge port. Claim one per project; sharing a port is how a "
+                            "verifier reports a clean pass about the wrong game")
+    start.add_argument("--world", default=None, metavar="NAME",
+                       help="boot straight into this singleplayer world")
+    start.add_argument("--username", default="Dev",
+                       help="offline player name (default: Dev). The UUID derives from it, so "
+                            "keeping it stable keeps the same player across launches")
+    start.add_argument("--width", type=int, default=None)
+    start.add_argument("--height", type=int, default=None,
+                       help="force a window size, for shots that need consistent framing")
+    start.add_argument("--memory", type=int, default=None, metavar="MB",
+                       help="override the instance's allocated memory")
+    start.add_argument("--java", default=None, help="override the bundled JRE")
+    start.add_argument("--install-root", default=None,
+                       help="the CurseForge Install directory, if it is not beside the instance")
+    start.add_argument("--dry-run", action="store_true",
+                       help="print the command line and exit, without starting anything")
+    start.add_argument("--wait", action="store_true",
+                       help="block until devbridge answers on the port")
+    start.add_argument("--for", dest="for_seconds", type=float, default=300.0,
+                       help="how long --wait waits (default: 300s)")
+    start.set_defaults(func=cmd_launch)
 
     probe = subs.add_parser("probe", help="report the block at a position")
     for axis in ("x", "y", "z"):

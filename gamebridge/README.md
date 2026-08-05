@@ -21,6 +21,24 @@ gamebridge check "block 6 125 0 recompile:corrugated_metal"
 gamebridge check "entity @e[type=minecraft:painting]" --count 6
 ```
 
+## Starting the game
+
+`launch` builds the same command line the CurseForge app would and runs it, with devbridge switched
+on and a world loaded. It reads the instance and downloads nothing; the app already keeps a
+vanilla-shaped install (`versions/`, `libraries/`, `assets/`, bundled JREs) beside it.
+
+```
+gamebridge launch --instance "C:/.../Instances/Trashlands" --port 8604 --world "New World" \
+                  --width 1280 --height 720 --wait
+```
+
+`--wait` blocks until the mod answers and checks the protocol version, so the next command in a
+script can assume a game that is up and compatible. `--dry-run` prints the command line and starts
+nothing, which is the fastest way to see why a launch would fail.
+
+It never writes to `minecraftinstance.json`. Editing that file is a known way to break an instance;
+this only reads it.
+
 Against the mod instead of RCON, pass `--devbridge <port>`. Pick a port per project rather than
 copying one out of an example; two projects sharing a number is how a verifier reports a clean pass
 about the wrong game.
