@@ -16,11 +16,13 @@ Install the client. It ships with the mod it talks to, so the two cannot drift:
 pip install "gamebridge @ git+https://github.com/Flatts3000/devbridge.git#subdirectory=gamebridge"
 ```
 
-**Claim a port, and do not copy the one in the examples.** Every project that copies the same number
-lands on the same socket. That is not theoretical: two projects on one machine both used 25580, and
-a pack's verifier connected to a different game's dev client and reported a clean pass about the
-wrong world. `gamebridge --devbridge <port> ping` tells you which side answered, so a wrong
-connection is at least visible.
+**Claim a port per project, and do not reuse one you saw in somebody's README.** There is no default
+anywhere: the mod stays idle without an explicit port, and the client requires one. Every project
+that copies the same number lands on the same socket, which is not theoretical - two on one machine
+both used 25580, and a pack's verifier connected to a different game's dev client and reported a
+clean pass about the wrong world. That is why the examples below take a port rather than supply one.
+`gamebridge --devbridge <port> ping` reports which side answered, so a wrong connection is at least
+visible.
 
 Get the jar from [Releases](https://github.com/Flatts3000/devbridge/releases), or build it with
 `./gradlew build` and take it from `build/libs/`.
@@ -33,7 +35,10 @@ Put the jar in `run/mods/`, then in your `build.gradle`:
 runs {
     client {
         client()
-        systemProperty 'devbridge.port', '25580'
+        // Your claimed port. Deliberately not a real number here: a copyable one is how two
+        // projects end up sharing a socket. A non-numeric value fails loudly at startup,
+        // naming the property, rather than opening something you did not mean to open.
+        systemProperty 'devbridge.port', '<your port>'
 
         // Optional: boot straight into a world instead of stopping at the title screen.
         programArguments.addAll '--quickPlaySingleplayer', 'My World'
@@ -47,9 +52,9 @@ launch dies before Minecraft starts. Use `programArguments`, as above.
 Then `./gradlew runClient` and drive it:
 
 ```bash
-gamebridge --devbridge 25580 ping
-gamebridge --devbridge 25580 --player @s cmd "time set day"
-gamebridge --devbridge 25580 shot my_scene
+gamebridge --devbridge <your port> ping
+gamebridge --devbridge <your port> --player @s cmd "time set day"
+gamebridge --devbridge <your port> shot my_scene
 ```
 
 **Options go before the subcommand.** `--devbridge`, `--player` and `--timeout` belong to the tool,
@@ -67,8 +72,10 @@ system property. `gamebridge launch` builds the command itself: it reads the app
 3. Launch:
 
 ```bash
+PORT=8604   # the port THIS project claimed. Claim your own; there is no default.
+
 gamebridge launch --instance "C:/Users/you/curseforge/minecraft/Instances/YourPack" \
-                  --port 8604 --world "New World" --width 1280 --height 720 --wait
+                  --port "$PORT" --world "New World" --width 1280 --height 720 --wait
 ```
 
 `--wait` blocks until the mod answers and checks the protocol version, so the next line of a script
@@ -78,19 +85,22 @@ which is the fastest way to see why a launch would fail.
 A full unattended loop looks like this:
 
 ```bash
-gamebridge launch --instance "$INSTANCE" --port 8604 --world "New World" --wait
-gamebridge --devbridge 8604 --player @s cmd "function yourpack:showcase/hall"
-gamebridge --devbridge 8604 hud off
-gamebridge --devbridge 8604 shot hall
-gamebridge --devbridge 8604 stop
+gamebridge launch --instance "$INSTANCE" --port "$PORT" --world "New World" --wait
+gamebridge --devbridge "$PORT" --player @s cmd "function yourpack:showcase/hall"
+gamebridge --devbridge "$PORT" hud off
+gamebridge --devbridge "$PORT" shot hall
+gamebridge --devbridge "$PORT" stop
 ```
 
 `stop` is a verb of its own, not `cmd stop`: the console `/stop` is a dedicated-server command and
 does not exist in singleplayer, which is the case this tool is for.
 
-## The verbs
+## The commands
 
-| Verb | What it does |
+These are the CLI's subcommands. Most map to a protocol verb of the same name; `shot` is the
+`screenshot` verb, and `launch` is not a verb at all because the game is not running yet.
+
+| Command | What it does |
 |---|---|
 | `ping` | Handshake: protocol version, which side answered, and the client's pause and input state |
 | `cmd` | Run one command and return what it printed. Takes an optional `player` |
