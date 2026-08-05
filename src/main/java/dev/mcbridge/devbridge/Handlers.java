@@ -50,8 +50,7 @@ final class Handlers {
             case "ping" -> ping(server);
             case "cmd" -> command(server, request.get("command").getAsString(),
                 request.has("player") ? request.get("player").getAsString() : null);
-            case "screenshot" -> ClientHandlers.screenshot(server,
-                request.has("name") ? request.get("name").getAsString() : null);
+            case "screenshot" -> screenshot(request, server);
             case "hud" -> ClientHandlers.hud(server,
                 !request.has("show") || request.get("show").getAsBoolean());
             case "input" -> ClientHandlers.input(server,
@@ -96,6 +95,27 @@ final class Handlers {
         // mouse is yours, and which directory it is running out of.
         ClientHandlers.describe(reply, server);
         return reply;
+    }
+
+    /**
+     * A capture, at the window's size or at one the caller names.
+     *
+     * <p>Both dimensions or neither: naming one is almost always a mistake, and silently ignoring
+     * it would produce a picture of the wrong shape with nothing to say why.
+     */
+    private static JsonObject screenshot(JsonObject request, MinecraftServer server)
+            throws Exception {
+        String name = request.has("name") ? request.get("name").getAsString() : null;
+        boolean hasWidth = request.has("width");
+        boolean hasHeight = request.has("height");
+        if (hasWidth != hasHeight) {
+            return error("screenshot needs both width and height, or neither");
+        }
+        if (!hasWidth) {
+            return ClientHandlers.screenshot(server, name);
+        }
+        return ClientHandlers.screenshot(server, name,
+            request.get("width").getAsInt(), request.get("height").getAsInt());
     }
 
     /** By name, or the only player online when asked for {@code "@s"} or an empty name. */

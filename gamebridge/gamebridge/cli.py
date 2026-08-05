@@ -130,7 +130,7 @@ def cmd_shot(args) -> int:
     if args.devbridge is None:
         sys.exit("screenshots need --devbridge: RCON talks to a server, and a server has no client")
     with connect(args) as bridge:
-        reply = bridge.screenshot(args.name)
+        reply = bridge.screenshot(args.name, args.width, args.height)
     print(reply.get("path") or reply.get("message", "screenshot taken"))
     return 0
 
@@ -393,6 +393,10 @@ def main(argv: list[str] | None = None) -> int:
     shot = subs.add_parser("shot", help="take a screenshot (devbridge only)")
     shot.add_argument("name", nargs="?", default=None,
                       help="file name without extension; omit for the timestamped default")
+    shot.add_argument("--width", type=int, default=None)
+    shot.add_argument("--height", type=int, default=None,
+                      help="capture at exactly this size, resizing the window for the moment of "
+                           "the shot and putting it back. Both or neither")
     shot.set_defaults(func=cmd_shot)
 
     hud = subs.add_parser("hud", help="show or hide the HUD (devbridge only)")

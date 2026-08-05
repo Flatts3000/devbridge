@@ -34,6 +34,19 @@ final class ClientHandlers {
         return ScreenshotTaker.take(name);
     }
 
+    static JsonObject screenshot(MinecraftServer server, String name, int width, int height)
+            throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a screenshot needs an integrated server, "
+                + "and this is a dedicated one");
+        }
+        if (width <= 0 || height <= 0) {
+            return Handlers.error("width and height must both be positive, or omit both to capture "
+                + "at whatever size the window already is");
+        }
+        return ScreenshotTaker.take(name, width, height);
+    }
+
     static JsonObject hud(MinecraftServer server, boolean show) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: the HUD is a client thing");

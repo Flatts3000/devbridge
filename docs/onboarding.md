@@ -112,7 +112,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 |---|---|
 | `ping` | Handshake: protocol version, which side answered, and the client's pause and input state |
 | `cmd` | Run one command and return what it printed. Takes an optional `player` |
-| `shot` | Screenshot, written before the reply comes back |
+| `shot` | Screenshot, written before the reply comes back. `--width`/`--height` capture at an exact size |
 | `hud` | Show or hide the HUD |
 | `input` | Hand the mouse back, or take it |
 | `pause` | Restore pausing on lost focus, or turn it off |
@@ -147,6 +147,11 @@ gamebridge --devbridge "$PORT" log --since "$MARK" --level ERROR --fail-on-error
 
 It reads the log file rather than asking the game, so it also works on a game that has already
 died - which is exactly when you most want it.
+
+**A gallery wants consistent dimensions.** `shot --width 1920 --height 1080` captures at exactly
+that size whatever the window is, by resizing it for the moment of the capture and putting it back.
+The window visibly changes shape while that happens, and it refuses on a fullscreen window rather
+than fighting the window manager.
 
 **`shot` only returns a path when you name the file.** Without a name the file gets Minecraft's
 timestamped default, chosen inside the capture and never handed back, so the reply carries a message
