@@ -132,7 +132,7 @@ One request per line, one reply per line.
 
 | Verb | Runs on | Request fields | Reply |
 |---|---|---|---|
-| `ping` | either | none | `{"ok":true,"protocol":1,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
+| `ping` | either | none | `{"ok":true,"protocol":2,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
 | `screenshot` | client render thread | optional `name`, optional `width`+`height` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
@@ -149,9 +149,10 @@ change lands late because consequences are asynchronous. Treat the fields as obs
 the result with `screen` or a screenshot.
 
 `protocol` is the wire protocol's version, and `gamebridge` refuses to talk to a mod whose number it
-does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning:
-adding either does not move it, because a client that has never heard of a new verb carries on
-working. A reply with no `protocol` field at all is a mod from before the field existed.
+does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning: adding either does not
+move it, because a client that has never heard of a new verb carries on working. It went to 2 in
+0.3.0 because `click`'s `handled` changed meaning without changing name or type, which is exactly
+the case a version number exists to catch. A reply with no `protocol` field at all is a mod from before the field existed.
 
 `worldName`, `mods` and `gameDir` are there to answer "which game is this", which nothing else in
 the reply does: two clients of the same Minecraft version are otherwise identical. `gamebridge ping

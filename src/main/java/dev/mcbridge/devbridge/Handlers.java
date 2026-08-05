@@ -38,8 +38,15 @@ final class Handlers {
      * {@code check_invariants.sh} fails the build if the two drift. That check is the reason the
      * client lives in this repo: before it did, three verbs and two ping fields were added here with
      * nothing to notice that the client could not speak them.
+     *
+     * <p><b>2</b> - {@code click}'s {@code handled} changed meaning. It was {@code mouseClicked}'s
+     * return alone; it is now that or {@code mouseReleased}, so a click taken on release reports
+     * true where it used to report false. Everything else since 1 was additive and would not have
+     * moved this on its own. Applying the rule to a field whose type and name did not change is the
+     * whole point of having it: a client reading the old meaning is quietly wrong rather than
+     * broken, which is the failure this number exists to make loud.
      */
-    static final int PROTOCOL_VERSION = 1;
+    static final int PROTOCOL_VERSION = 2;
 
     private Handlers() {
     }

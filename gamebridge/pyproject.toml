@@ -1,6 +1,6 @@
 [project]
 name = "gamebridge"
-version = "0.2.0"
+version = "0.3.0"
 description = "Drive a running Minecraft instance from outside: start it, run commands, take screenshots, verify the world. RCON for a dedicated server, the devbridge mod for singleplayer."
 requires-python = ">=3.11"
 dependencies = []

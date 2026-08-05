@@ -17,7 +17,7 @@ print its reply object instead of a sentence, which is what a script or an agent
 
 ```
 $ gamebridge --json --devbridge $PORT ping
-{"ok": true, "protocol": 1, "side": "integrated", "worldName": "New World", ...}
+{"ok": true, "protocol": 2, "side": "integrated", "worldName": "New World", ...}
 ```
 
 ```

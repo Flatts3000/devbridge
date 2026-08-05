@@ -18,7 +18,7 @@ class DevBridgeError(RuntimeError):
 
 #: The wire protocol this client speaks. Must equal Handlers.PROTOCOL_VERSION in the mod, and
 #: .github/scripts/check_invariants.sh fails the build if the two drift.
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 
 
 class DevBridge:

@@ -58,7 +58,7 @@ body:
     attributes:
       label: devbridge version
       description: The jar filename, or the commit if you built it yourself.
-      placeholder: devbridge-26.1.2-0.2.0.jar
+      placeholder: devbridge-26.1.2-0.3.0.jar
     validations:
       required: true
 
