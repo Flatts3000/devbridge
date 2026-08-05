@@ -27,6 +27,7 @@ gamebridge script scene.mcfunction                    run a file, a command per 
 gamebridge probe 2 121 2                              what block entity data is at a position
 gamebridge check "block 6 125 0 recompile:corrugated_metal"
 gamebridge check "entity @e[type=minecraft:painting]" --count 6
+gamebridge look                                       where the camera is, what the crosshair is on
 gamebridge screen                                     what GUI is open and what is in it
 gamebridge click --text Respawn                       press a widget by its label
 ```

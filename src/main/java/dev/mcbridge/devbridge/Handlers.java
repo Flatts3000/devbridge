@@ -71,6 +71,7 @@ final class Handlers {
             case "click" -> ClientHandlers.click(server,
                 request.get("x").getAsDouble(), request.get("y").getAsDouble(),
                 request.has("button") ? request.get("button").getAsInt() : 0);
+            case "look" -> ClientHandlers.look(server);
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a
             // tool whose entire job is reporting what happened.

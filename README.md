@@ -141,12 +141,22 @@ One request per line, one reply per line.
 | `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270,"widgets":[...],"widgetsComplete":true}` |
 | `cursor` | client render thread | `x`, `y` (GUI-scaled) | `{"ok":true,"x":167,"y":144,"rawX":668,"rawY":576}` |
 | `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"onPress":true,"onRelease":false,"handled":true,"screenBefore":"...","screen":"...","changedScreen":false}` |
+| `look` | client render thread | none | `{"ok":true,"camera":{"pos":[-5.5,72.62,-0.5],"yaw":0.0,"pitch":90.0,"fov":70.0,"detached":false,"entity":"minecraft:player"},"hit":{"type":"block","at":[...],"distance":1.62,"pos":[-6,70,-1],"face":"up","inside":false,"block":"minecraft:oak_stairs[facing=east,half=top,...]"}}` |
 | `stop` | either | none | `{"ok":true,"quits":true}` - closes the world, and on a client quits the game |
 
 **Nothing `click` returns is a verdict.** Screens over-report (a creative inventory answers clicks on
 empty background) and under-report (a quest-book tab acts while returning false), and even a screen
 change lands late because consequences are asynchronous. Treat the fields as observations and check
 the result with `screen` or a screenshot.
+
+**`look` answers the two questions a command cannot, and deliberately nothing else.** Position,
+rotation, velocity and on-ground all come back from `data get entity` - including real `Motion` for a
+player, which is worth knowing since movement is client-authoritative and it might have read zero. So
+`look` reports only the residue: **where the camera is**, which is not the player in third person or
+spectator (spectating a cow reports `"entity":"minecraft:cow"` and the cow's eye position), and
+**what the crosshair is on**, for which there is no vanilla raycast at all. A block hit carries its
+canonical `id[properties]` form - which `/data get block` cannot give you, since it refuses on
+anything that is not a block entity.
 
 **`screen` lists what the screen drew, so you do not have to compute where to click.** Each widget
 carries its `text`, its bounds, and a `centerX`/`centerY` in the same GUI-scaled space `click` takes:

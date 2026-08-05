@@ -119,6 +119,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `screen` | What GUI is open, what widgets are in it and where to click each, or open the inventory / close what is open |
 | `cursor` | Move the pointer, which is what makes a tooltip render |
 | `click` | Press and release at a point, or on `--text NAME` from the widget list. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
+| `look` | Where the camera is, and what block or entity the crosshair is on |
 | `probe` | Block entity data at a position, or `--is` to test what block it is |
 | `ps` | What has been launched, and whether it is still running |
 | `log` | What the game logged since a marker, so a silent failure stops being silent |
