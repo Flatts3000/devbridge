@@ -27,6 +27,19 @@ jobs:
       - name: Check security invariants
         run: sh .github/scripts/check_invariants.sh
 
+      # The client half. Stdlib-only and importable, which is most of what can go wrong in a package
+      # whose real test needs a running game.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Check gamebridge
+        run: |
+          python -m compileall -q gamebridge/gamebridge
+          pip install ./gamebridge
+          python -c "import gamebridge.cli, gamebridge.devbridge, gamebridge.rcon"
+          gamebridge --help > /dev/null
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

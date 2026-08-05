@@ -31,6 +31,7 @@ screenshots in the loop, "change a number, rebuild, reshoot, look" is one comman
 | Client vs server verbs | **Both, in one mod** | Commands need the server thread, screenshots need the client render thread. In singleplayer both live in one process, which is exactly the case RCON cannot serve |
 | Focus pause | **Turned off on world load. `devbridge.keepTicking=false` opts out** | The pause screen stops the integrated server ticking, so an unfocused client answers nothing. Every use of this mod is from outside the window, so the pause is almost never what anybody wanted. Set in memory rather than saved, so it does not outlive the mod |
 | Mouse input | **Locked on world load. `devbridge.lockInput=false` opts out** | Removing the pause removed the thing that stopped a stray alt-tab turning the camera mid-shoot. Locked by default because that accident is the default way of working |
+| Where the client lives | **`gamebridge/` in this repo, one project with the mod** | Two halves of one wire protocol with no version field, in two repos, one of which had no git remote. The drift was not hypothetical: three verbs and two `ping` fields shipped in the mod while the client knew about none of them. `ping` now carries a protocol version and CI fails if the two constants disagree. The published-vs-never-published boundary is held by wording and by the no-Maven invariant, not by repo separation |
 | Behaviour switches | **System properties defaulting to on, plus a verb each** | These are ergonomics, not the security boundary, which is why they are options when the bind address is not. Default on so the common case needs no arguments; a launch property for "never do this to me", a verb for "not right now". Only the exact string `false` turns one off, so a typo leaves the default rather than silently disabling it |
 
 ## 2. Security, stated plainly
@@ -59,7 +60,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "run/screenshots/museum.png"}
 
 {"verb": "ping"}
-{"ok": true, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "pauseOnLostFocus": false, "inputLocked": true}
+{"ok": true, "protocol": 1, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "pauseOnLostFocus": false, "inputLocked": true}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a

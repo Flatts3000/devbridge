@@ -114,6 +114,25 @@ for f in $(find "$src" -name '*.java'); do
     fi
 done
 
+# ---------------------------------------------------------------------------
+# 6. The mod and the client agree on the protocol version.
+#
+# This is the check the merge was for. Before the client lived here, three verbs and two ping fields
+# were added to the mod with nothing anywhere to notice that the client could not speak them. Two
+# halves of one wire protocol in one repo are only worth anything if something enforces that they
+# ship together.
+# ---------------------------------------------------------------------------
+mod_protocol=$(grep -oE 'PROTOCOL_VERSION = [0-9]+' \
+    src/main/java/dev/mcbridge/devbridge/Handlers.java | grep -oE '[0-9]+' || true)
+client_protocol=$(grep -oE '^PROTOCOL_VERSION = [0-9]+' \
+    gamebridge/gamebridge/devbridge.py | grep -oE '[0-9]+' || true)
+
+if [ -z "$mod_protocol" ] || [ -z "$client_protocol" ]; then
+    fail "could not read PROTOCOL_VERSION from both the mod and the client."
+elif [ "$mod_protocol" != "$client_protocol" ]; then
+    fail "protocol drift: the mod speaks $mod_protocol, the client speaks $client_protocol."
+fi
+
 if [ "$status" -eq 0 ]; then
     echo "invariants OK: loopback-only bind, no wildcard address, not publishable, opt-in gated,"
     echo "no client classes outside $client_only."

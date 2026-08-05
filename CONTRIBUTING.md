@@ -25,11 +25,17 @@ wants: a check that people learn to work around stops being a check.
 
 ## Build
 
-JDK 25, no other prerequisites. The Gradle wrapper handles the rest.
+JDK 25 for the mod, Python 3.11+ for the CLI. The Gradle wrapper handles the rest.
 
 ```bash
 JAVA_HOME="/c/Program Files/Java/jdk-25" ./gradlew build
+pip install -e ./gamebridge
 ```
+
+If you change the wire protocol, change both halves. `Handlers.PROTOCOL_VERSION` and the
+`PROTOCOL_VERSION` in `gamebridge/gamebridge/devbridge.py` have to match, and CI fails if they do
+not. Bump it only when a verb or field is renamed, removed, or changes meaning; adding one is
+backwards compatible and should not move the number.
 
 Output lands at `build/libs/devbridge-26.1.2-<version>.jar`. Mod metadata, the Minecraft version and
 the NeoForge version all live in `gradle.properties` and are expanded into `neoforge.mods.toml` at

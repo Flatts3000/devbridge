@@ -6,7 +6,13 @@
 [![dev only: do not ship](https://img.shields.io/badge/dev%20only-do%20not%20ship-red.svg)](SECURITY.md)
 
 A **development-only** NeoForge mod that lets tooling outside the game drive a running Minecraft
-instance: run commands, take screenshots, and read the answers back.
+instance: run commands, take screenshots, and read the answers back. Plus `gamebridge`, the Python
+CLI that speaks to it.
+
+**Two artefacts, and only one of them is for installing.** The mod is a dev-only backdoor that must
+never reach a player: see [SECURITY.md](SECURITY.md). The CLI is an ordinary tool you are meant to
+install. They live together because they are two halves of one wire protocol, and keeping them in
+separate repos is how a client quietly stops being able to speak to its own mod.
 
 ```
 $ gamebridge --devbridge 25580 cmd "function mymod:showcase/museum"
@@ -70,7 +76,20 @@ runs {
 ```
 
 Then talk to it with any client that speaks newline-delimited JSON over TCP. The reference one is
-`gamebridge`, a small Python CLI.
+`gamebridge`, in this repo:
+
+```
+pip install "gamebridge @ git+https://github.com/Flatts3000/devbridge.git#subdirectory=gamebridge"
+gamebridge --devbridge 25580 ping
+```
+
+Stdlib-only, no dependencies. `pip install` puts no jar anywhere: the CLI and the mod reach you by
+completely separate routes, which is why one can be installable while the other is never published.
+
+**Pick your own port and do not copy the one in these examples.** Every project that copies `25580`
+lands on the same number, and a verifier that connects to a different game's dev client will report
+a clean pass about the wrong world. It has happened. `gamebridge --devbridge <port> ping` reports
+which side answered and the protocol version, so a wrong connection is at least visible.
 
 **Loading a world turns off pause-on-lost-focus for you, the same as pressing F3+P.** Every use of
 this mod involves the window not being focused, and a singleplayer world left to itself opens the
@@ -94,13 +113,18 @@ One request per line, one reply per line.
 
 | Verb | Runs on | Request fields | Reply |
 |---|---|---|---|
-| `ping` | either | none | `{"ok":true,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"pauseOnLostFocus":false,"inputLocked":true}` |
+| `ping` | either | none | `{"ok":true,"protocol":1,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"pauseOnLostFocus":false,"inputLocked":true}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
 | `screenshot` | client render thread | optional `name` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
 | `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
 | `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
 | `stop` | either | none | Closes the world and quits |
+
+`protocol` is the wire protocol's version, and `gamebridge` refuses to talk to a mod whose number it
+does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning:
+adding either does not move it, because a client that has never heard of a new verb carries on
+working. A reply with no `protocol` field at all is a mod from before the field existed.
 
 The last two `ping` fields are client-only and absent on a dedicated server, where `hasClient` has
 already said so. They are there because "will this client answer while I am looking at my terminal"
