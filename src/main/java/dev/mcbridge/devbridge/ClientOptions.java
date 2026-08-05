@@ -4,8 +4,8 @@ import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 
 /**
- * Keeps the game running while its window is in the background. Loaded only on a client - see
- * {@link ClientHandlers}.
+ * Client-level state and lifecycle: whether the game keeps running unfocused, which directory it is
+ * running out of, and shutting it down. Loaded only on a client - see {@link ClientHandlers}.
  *
  * <p><b>This is what F3+P does, and it is automatic because every use of this mod involves the
  * window not being focused.</b> {@code Minecraft.pauseIfInactive} opens the pause screen half a
@@ -72,5 +72,17 @@ final class ClientOptions {
      */
     static String gameDirectory() {
         return Minecraft.getInstance().gameDirectory.toPath().toAbsolutePath().toString();
+    }
+
+    /**
+     * Close the game.
+     *
+     * <p>Queued onto the client thread, which is the only one allowed to end the run loop.
+     * {@code Minecraft.stop()} does nothing but set a flag; the loop notices, unwinds, and the
+     * process exits.
+     */
+    static void quit() {
+        Minecraft client = Minecraft.getInstance();
+        client.execute(client::stop);
     }
 }
