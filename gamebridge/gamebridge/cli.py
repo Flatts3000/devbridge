@@ -165,6 +165,14 @@ def cmd_shot(args) -> int:
         sys.exit("screenshots need --devbridge: RCON talks to a server, and a server has no client")
     with connect(args) as bridge:
         reply = bridge.screenshot(args.name, args.width, args.height)
+    if reply.get("guiRelayout"):
+        # To stderr in both modes: it does not belong in a path a script is reading, and a --json
+        # caller that only checks `path` should still be told rather than left to notice the field.
+        was, now = reply["screenBefore"], reply["screenAtCapture"]
+        print(f"warning: the resize re-laid-out the open GUI, {was['width']}x{was['height']} -> "
+              f"{now['width']}x{now['height']}. Anything measured off this image is in a layout "
+              f"that no longer exists. Use `screen` for widget bounds in the live one.",
+              file=sys.stderr)
     emit(args, reply, reply.get("path") or reply.get("message", "screenshot taken"))
     return 0
 

@@ -134,7 +134,7 @@ One request per line, one reply per line.
 |---|---|---|---|
 | `ping` | either | none | `{"ok":true,"protocol":2,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
-| `screenshot` | client render thread | optional `name`, optional `width`+`height` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
+| `screenshot` | client render thread | optional `name`, optional `width`+`height` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk. Plus `guiRelayout`, `screenBefore` and `screenAtCapture` when a GUI was open for a sized shot |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
 | `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
 | `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
@@ -212,6 +212,14 @@ player online, which is what a singleplayer dev run always has.
 **`screenshot` only returns `path` when you name the file.** Without a `name` the file gets
 Minecraft's timestamped default, which is chosen inside the capture and never handed back, so the
 reply carries `message` and `dir` and you are on your own to find it. Name your shots.
+
+**A sized shot re-lays-out an open GUI, and now says so.** Resizing the window for the capture
+changes the GUI scale with it: measured, a screen reporting 480x270 in a 1920x1080 window came back
+342x256 when captured at 1024x768, because the scale dropped from 4 to 3. Anything measured off that
+image points somewhere else once the window is itself again, and the two layouts are not related by a
+scale - widgets move relative to each other. The reply carries both, `gamebridge shot` warns on
+stderr, and the answer to "where do I click" is `screen`'s widget bounds, which are always in the
+live layout. A world shot is unaffected: there is no layout to move.
 
 **`hud` is a separate verb, not a flag on `screenshot`.** The capture takes the framebuffer as it
 already is, so hiding the HUD and grabbing in one call would still catch the frame that was drawn
