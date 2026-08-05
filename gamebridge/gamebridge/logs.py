@@ -47,6 +47,11 @@ def read_since(game_dir: str | Path, since: int = 0, level: str = "WARN") -> dic
     if wanted is None:
         raise LogError(f"unknown level {level!r}: expected one of {', '.join(_RANK)}")
 
+    if since < 0:
+        # seek() would raise a bare ValueError out of the middle of the read, which reaches the user
+        # as a traceback rather than as an answer.
+        raise LogError(f"marker cannot be negative: {since}")
+
     path = log_path(game_dir)
     size = path.stat().st_size
     if since > size:
