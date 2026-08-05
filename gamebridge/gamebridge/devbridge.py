@@ -107,8 +107,20 @@ class DevBridge:
         """
         return self.request(verb="pause", enabled=enabled)
 
-    def screenshot(self, name: str | None = None) -> dict:
-        return self.request(verb="screenshot", **({"name": name} if name else {}))
+    def screenshot(self, name: str | None = None,
+                   width: int | None = None, height: int | None = None) -> dict:
+        """Capture, optionally at an exact size.
+
+        Naming a size resizes the window for the moment of the capture and puts it back, because the
+        scene has to be drawn at that size: there is no way to render the level into an offscreen
+        target on demand. The window visibly changes shape while it happens.
+        """
+        payload: dict = {"verb": "screenshot"}
+        if name:
+            payload["name"] = name
+        if width is not None or height is not None:
+            payload["width"], payload["height"] = width, height
+        return self.request(**payload)
 
     def ping(self, check_protocol: bool = True, expect_instance: str | None = None) -> dict:
         """Handshake, the version check, and optionally an identity check.
