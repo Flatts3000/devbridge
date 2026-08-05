@@ -63,7 +63,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "output": "Running function recompile:showcase/museum"}
 
 {"verb": "screenshot", "name": "museum"}
-{"ok": true, "path": "run/screenshots/museum.png"}
+{"ok": true, "path": "C:/.../run/screenshots/museum.png", "dir": "C:/.../run/screenshots"}
 
 {"verb": "ping"}
 {"ok": true, "protocol": 1, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
@@ -82,7 +82,10 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
 | `input` | client render thread | Hands the mouse back, or takes it again. Not locked unless asked; see the decisions table |
 | `pause` | client render thread | Restores pausing on lost focus, or turns it off again. Off automatically on world load |
-| `stop` | either | Closes the world and quits. Lets a script own the whole lifecycle |
+| `screen` | client render thread | Reports the open GUI, its title and its GUI-scaled size; opens the inventory or closes anything |
+| `cursor` | client render thread | Moves the pointer, which is what renders a tooltip. Moves the real OS cursor, not just the screen's idea of it |
+| `click` | client render thread | Press and release at a point, reporting whether anything took it |
+| `stop` | either | Halts the world. **On a client it returns to the title screen rather than quitting**, which leaves the process holding the world's file locks |
 
 ## 4. The two threading traps
 
@@ -105,13 +108,13 @@ half `gamebridge` already provides and not the half worth building.
 run/mods/devbridge-0.1.0.jar
 ```
 
-then launch with `-Ddevbridge.port=25580`. In a Gradle moddev run:
+then launch with `-Ddevbridge.port=<a port you claimed>`. In a Gradle moddev run:
 
 ```groovy
 runs {
     client {
         client()
-        systemProperty 'devbridge.port', '25580'
+        systemProperty 'devbridge.port', '<a port you claimed>'
     }
 }
 ```
@@ -125,8 +128,8 @@ a named singleplayer world with the bridge open, and no human has touched anythi
 scripts work against either:
 
 ```
-gamebridge --devbridge 25580 cmd "function recompile:showcase/museum"
-gamebridge --devbridge 25580 shot museum
+gamebridge --devbridge $PORT cmd "function recompile:showcase/museum"
+gamebridge --devbridge $PORT shot museum
 ```
 
 RCON stays the default for dedicated servers. The two transports share `cmd` and the assertions
@@ -181,13 +184,11 @@ which is the argument for building the loop before polishing it.
 
 ## 10. Open
 
-- **Screenshot resolution. Half answered.** The question was whether to force a window size for
-  reproducible framing. `gamebridge launch --width/--height` does force it, and a shot taken through
-  a launched client comes back at exactly those dimensions. What is still open is the other half: a
-  shot taken against a client somebody started by hand is whatever that window happens to be, so the
-  resolution is a property of how the game was launched rather than of the request. Rendering to an
-  offscreen target at a size named on the `screenshot` request would decouple them. Tracked as
-  [#14](https://github.com/Flatts3000/devbridge/issues/14).
+**Nothing.** The screenshot-resolution question, open since the spec was written, was answered by
+[#14](https://github.com/Flatts3000/devbridge/issues/14): `screenshot` takes a width and height and
+resizes the window for the moment of the capture. Not the offscreen render the question imagined,
+because `Screenshot.grab` captures what is already in a target and vanilla cannot draw the level
+into an arbitrary one on demand.
 
-Everything else that is open is in [the issue tracker](https://github.com/Flatts3000/devbridge/issues).
-This section is for questions the design has not answered, not for a backlog.
+Open work lives in [the issue tracker](https://github.com/Flatts3000/devbridge/issues). This section
+is for questions the design itself has not answered, and there are none.

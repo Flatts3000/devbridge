@@ -78,8 +78,8 @@ published to any Maven repository, deliberately.
 
 ## Architecture
 
-Two halves. `src/` is the mod, seven classes, and the split between the server-safe four and the
-client-only three is a load-bearing safety property, not taste. `gamebridge/gamebridge/` is the
+Two halves. `src/` is the mod, eight classes, and the split between the server-safe four and the
+client-only four is a load-bearing safety property, not taste. `gamebridge/gamebridge/` is the
 client: `devbridge.py` (this protocol), `rcon.py` (the other transport), `launch.py` (starting a
 game, which is not a verb because nothing is listening yet), and `cli.py` over the top.
 
@@ -98,12 +98,13 @@ The mod:
   and the `ok()` / `error()` reply builders. Owns the command-output capture and `findPlayer`.
   Unknown verbs fail loudly.
 - **`ClientHandlers`** - the dist guard. Answers `available()` and refuses every client verb
-  (`screenshot`, `hud`, `input`, `pause`) with a message when there is no client. Also the one place
+  (`screenshot`, `hud`, `input`, `pause`, `screen`, `cursor`, `click`) with a message when there is
+  no client. Also the one place
   the automatic world-load setup and the extra `ping` fields go through, so nothing else has to know
   which side it is on.
-- **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`** - the only classes that touch
-  `Minecraft`, reached solely through `ClientHandlers` after the guard passes. Capture and HUD
-  toggle, pause-on-lost-focus, and the mouse lock respectively. Adding a client-only class means
+- **`ScreenshotTaker`**, **`ClientOptions`**, **`InputLock`**, **`ScreenDriver`** - the only classes that touch
+  `Minecraft`, reached solely through `ClientHandlers` after the guard passes: capture and HUD
+  toggle, pause-on-lost-focus, the mouse lock, and GUI driving respectively. Adding a client-only class means
   adding it to the list in `check_invariants.sh`, which is deliberate friction.
 
 Request flow: socket thread parses, `Handlers` queues onto the server thread (`server.execute`) or the

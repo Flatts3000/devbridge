@@ -130,11 +130,14 @@ One request per line, one reply per line.
 |---|---|---|---|
 | `ping` | either | none | `{"ok":true,"protocol":1,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
-| `screenshot` | client render thread | optional `name` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
+| `screenshot` | client render thread | optional `name`, optional `width`+`height` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
 | `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
 | `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
-| `stop` | either | none | Closes the world and quits |
+| `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270}` |
+| `cursor` | client render thread | `x`, `y` (GUI-scaled) | `{"ok":true,"x":167,"y":144,"rawX":668,"rawY":576}` |
+| `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"handled":true}` |
+| `stop` | either | none | Closes the world. On a client this returns to the title screen; it does not quit the process |
 
 `protocol` is the wire protocol's version, and `gamebridge` refuses to talk to a mod whose number it
 does not recognise. It only changes when a verb or field is renamed, removed, or changes meaning:

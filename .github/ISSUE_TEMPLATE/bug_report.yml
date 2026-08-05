@@ -27,6 +27,11 @@ body:
         - hud
         - input
         - pause
+        - screen
+        - cursor
+        - click
+        - log
+        - launch
         - stop
         - "Connecting at all"
         - Other

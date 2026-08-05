@@ -53,8 +53,8 @@ switch statement.
 So verification is manual, and a PR should say what was done:
 
 1. Build the jar and drop it in another mod's dev run at `run/mods/`.
-2. Add `systemProperty 'devbridge.port', '25580'` to that project's client run configuration.
-3. Launch, then talk to `localhost:25580` with newline-delimited JSON. Connect to `localhost`, not
+2. Add `systemProperty 'devbridge.port', '<a port you claimed>'` to that project's client run.
+3. Launch, then talk to `localhost:<that port>` with newline-delimited JSON. Connect to `localhost`, not
    `127.0.0.1`: `InetAddress.getLoopbackAddress()` can return `::1`, and dialling the IPv4 literal
    then reports "connection refused" from a socket that is working perfectly.
 4. At minimum: `{"verb":"ping"}` for the handshake, `{"verb":"cmd","command":"time set day"}` for the
@@ -88,7 +88,7 @@ own verb rather than a flag on `screenshot`.
   find out. Match that; do not strip it.
 - Four-space indent, Java 25, no wildcard imports.
 - Conventional commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`.
-- Files stay small. The whole mod is seven short classes and should stay legible in one sitting.
+- Files stay small. The whole mod is eight short classes and should stay legible in one sitting.
 
 ## Pull requests
 

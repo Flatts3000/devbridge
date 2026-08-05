@@ -9,8 +9,8 @@
 Two transports, same verbs. RCON reaches a dedicated server and is the default. The devbridge mod runs
 inside the game and is the only way to reach a SINGLEPLAYER world or to take a screenshot:
 
-    gamebridge --devbridge 25580 cmd "function recompile:showcase/museum"
-    gamebridge --devbridge 25580 shot museum
+    gamebridge --devbridge $PORT cmd "function recompile:showcase/museum"
+    gamebridge --devbridge $PORT shot museum
 
 Connection settings come from the server's own `server.properties`, found by walking up from the
 working directory, so there is nothing to configure and no password to keep in sync. Override with
