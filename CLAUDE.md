@@ -131,7 +131,12 @@ tracker.
   screenshot reply is sent from `Screenshot.grab`'s callback, not when the request is accepted, or a
   caller gets a path to a file that does not exist yet.
 - **`InetAddress.getLoopbackAddress()` may return `::1`**, so a client dialling `127.0.0.1` gets
-  "connection refused" from a healthy socket. Clients should connect to `localhost`.
+  "connection refused" from a healthy socket. Clients should connect to `localhost`, which resolves
+  through every address until one answers. The startup line logs
+  `socket.getLocalSocketAddress()` rather than a literal, because it used to print `127.0.0.1`
+  whatever was bound: a readiness poll written to agree with the log then reported a dead socket for
+  a full timeout while the game was serving, and the log confirming the wrong guess is what made it
+  expensive.
 - **`--args` on a moddev Gradle run is not program arguments** - it is taken as a main class and the
   launch dies before Minecraft starts. Use `programArguments`.
 - **The screenshot reply only carries `path` when the request named the file.** Unnamed requests get
