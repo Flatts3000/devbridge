@@ -126,6 +126,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `cursor` | Move the pointer, which is what makes a tooltip render |
 | `click` | Press and release at a point, or on `--text NAME` from the widget list. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
 | `look` | Where the camera is, and what block or entity the crosshair is on |
+| `check` | Assert a condition about the world. Exits 1 when it does not hold, 2 when the condition itself could not be evaluated |
 | `probe` | Block entity data at a position, or `--is` to test what block it is |
 | `ps` | What has been launched, and whether it is still running |
 | `log` | What the game logged since a marker, so a silent failure stops being silent |
