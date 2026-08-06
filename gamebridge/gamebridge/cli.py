@@ -188,19 +188,62 @@ def report_command_outcome(args, reply: dict) -> int:
 
 
 def cmd_script(args) -> int:
+    """Run a file of commands, saying which of them worked.
+
+    **A script is a sequence, which is what makes a silent failure worse here than in `cmd`.** Every
+    line after a failed one runs against a world that is not in the state it assumes, so one broken
+    line becomes a scene that is wrong in a way the output does not show: forty lines printed, exit
+    0, nothing marked. `cmd` is usually watched by a person; `script` is what an unattended run uses.
+
+    `--strict` stops at the first line that did not succeed, for the same reason. It is off by
+    default, matching `cmd --strict`, because reporting failure is an ordinary outcome for plenty of
+    commands and a run that passes today should not start dying on them.
+
+    Over RCON the outcome fields are absent and this behaves as it always did.
+    """
     lines = Path(args.file).read_text(encoding="utf-8").splitlines()
+    # Blanks and comments filtered up front, so "lines after it were not run" counts commands rather
+    # than file lines. Counting the file's lines made a three-command tail read as four.
+    commands = [line for line in (raw.strip() for raw in lines)
+                if line and not line.startswith("#")]
+    player = args.player if args.player else None
+    ran: list[dict] = []
+    stopped = None
+
     with connect(args) as rcon:
-        pairs = (rcon.script(lines, args.player)
-                 if args.player and hasattr(rcon, "hud") else rcon.script(lines))
+        if hasattr(rcon, "run"):
+            for line in commands:
+                reply = rcon.run(line, player)
+                ran.append({"command": line, "output": reply.get("output", ""),
+                            "executed": reply.get("executed"), "success": reply.get("success"),
+                            "result": reply.get("result")})
+                if not reply.get("success") and getattr(args, "strict", False):
+                    stopped = line
+                    break
+        else:
+            # RCON's script takes no player: that transport reaches a dedicated server, where the
+            # console is the only source there is. Passing one would be a TypeError, which is what
+            # the old `hasattr(rcon, "hud")` guard was quietly preventing.
+            pairs = rcon.script(lines)
+            ran = [{"command": c, "output": o} for c, o in pairs]
+
+    failed = [entry for entry in ran if entry.get("success") is False]
+
     if getattr(args, "json", False):
-        emit(args, {"ran": [{"command": c, "output": o} for c, o in pairs]})
+        emit(args, {"ran": ran, "failed": len(failed), "stopped": stopped})
     else:
-        for command, output in pairs:
-            print(f"> {command}")
-            if output:
-                for line in output.splitlines():
-                    print(f"  {line}")
-    return 0
+        for entry in ran:
+            mark = "" if entry.get("success") is not False else (
+                "  <-- did not run" if entry.get("executed") is False else "  <-- failed")
+            print(f"> {entry['command']}{mark}")
+            for line in entry["output"].splitlines():
+                print(f"  {line}")
+        if failed:
+            print(f"{len(failed)} of {len(ran)} lines did not succeed", file=sys.stderr)
+        if stopped:
+            print(f"stopped at {stopped!r}; {len(commands) - len(ran)} commands after it were "
+                  f"not run", file=sys.stderr)
+    return 1 if (failed and getattr(args, "strict", False)) else 0
 
 
 def cmd_shot(args) -> int:
@@ -798,6 +841,10 @@ def main(argv: list[str] | None = None) -> int:
 
     script = subs.add_parser("script", help="run a file of commands")
     script.add_argument("file")
+    script.add_argument("--strict", action="store_true",
+                        help="stop at the first line that did not succeed, and exit non-zero. A "
+                             "scene script is a sequence: every line after a failed one runs "
+                             "against a world that is not in the state it assumes. devbridge only")
     script.set_defaults(func=cmd_script)
 
     check = subs.add_parser("check", help="assert an `execute if` condition; non-zero when it fails")
