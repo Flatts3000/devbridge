@@ -358,6 +358,54 @@ def verify(command: list[str]) -> list[str]:
     return problems
 
 
+def check_installed_mod(instance: Path, client_version: str) -> tuple[str | None, str | None]:
+    """Whether the instance has a devbridge jar, and whether it looks like this client's.
+
+    Returns `(fatal, warning)`, either of which may be None.
+
+    **The mod and the client ship from one repo so they cannot drift, and an instance's `mods/`
+    folder is where they drift anyway**: nothing updates it when the client is reinstalled. The cost
+    is a whole launch - about a minute - before the first request comes back with a protocol
+    mismatch. That message is good and it arrives far too late.
+
+    A missing jar is fatal, because nothing will answer and the symptom is worse than an absence: the
+    game starts, the session records a live process, and the caller gets a refused socket from a pid
+    that is plainly running.
+
+    A version difference is only a warning. The filename carries the mod version, not the protocol,
+    and those move independently - 0.3.0 and 0.4.0 both speak protocol 2 - so refusing would block
+    somebody whose build is fine. Anything unreadable says nothing at all: a false alarm about a
+    working setup is worse than the silence it replaces.
+    """
+    mods = instance / "mods"
+    try:
+        jars = sorted(mods.glob("devbridge-*.jar")) if mods.is_dir() else None
+    except OSError:
+        return None, None
+    if jars is None:
+        return f"no mods directory in {instance}, so there is nothing for the jar to be in", None
+    if not jars:
+        return (f"no devbridge jar in {mods}. Nothing will answer on the port: put the jar there "
+                f"first, from a release or from build/libs/"), None
+
+    if len(jars) > 1:
+        names = ", ".join(jar.name for jar in jars)
+        return (f"{len(jars)} devbridge jars in {mods}: {names}. Two copies of one mod id is a "
+                f"duplicate-mod crash at startup, not a version to choose between"), None
+
+    # Trailing field of devbridge-<mc>-<version>.jar, and only when it actually looks like a
+    # version. A renamed jar has no version to disagree with, and warning that `custom` is not
+    # `0.4.0` is the false alarm this is supposed to avoid.
+    versions = {jar.stem.rsplit("-", 1)[-1] for jar in jars}
+    if not all(re.fullmatch(r"[0-9]+(\.[0-9]+)*", v) for v in versions):
+        return None, None
+    if client_version not in versions and not client_version.startswith("unknown"):
+        return None, (f"{jars[0].name} is installed but this client is {client_version}. They ship "
+                      f"from the same repo, so one is stale - reinstall whichever is older. A "
+                      f"protocol mismatch would only surface after the launch")
+    return None, None
+
+
 def reset_world(instance: Path, world: str, template: Path) -> None:
     """Replace a world with a copy of a template, so every run starts from the same state.
 

@@ -79,6 +79,12 @@ system property. `gamebridge launch` builds the command itself: it reads the app
 2. Claim a port.
 3. Launch:
 
+`launch` checks that jar before it starts anything. A missing one is fatal, because nothing would
+answer and the symptom is a refused socket from a process that is plainly running; two copies is
+fatal too, since a duplicate mod id crashes at startup. A version that differs from the client's is
+only a warning - the filename carries the mod version, not the protocol, and those move
+independently. Either way you learn in a second rather than after a minute of loading.
+
 ```bash
 PORT=8604   # the port THIS project claimed. Claim your own; there is no default.
 
