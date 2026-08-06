@@ -133,7 +133,7 @@ One request per line, one reply per line.
 | Verb | Runs on | Request fields | Reply |
 |---|---|---|---|
 | `ping` | either | none | `{"ok":true,"protocol":2,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
-| `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"..."}` - whatever the command printed |
+| `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"...","executed":true,"success":true,"result":201960}` - what it printed, whether it ran, whether it worked, and its integer result |
 | `screenshot` | client render thread | optional `name`, optional `width`+`height` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk. Plus `guiRelayout`, `screenBefore` and `screenAtCapture` when a GUI was open for a sized shot |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
 | `input` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"inputEnabled":true}` |
@@ -212,6 +212,19 @@ player online, which is what a singleplayer dev run always has.
 **`screenshot` only returns `path` when you name the file.** Without a `name` the file gets
 Minecraft's timestamped default, which is chosen inside the capture and never handed back, so the
 reply carries `message` and `dir` and you are on your own to find it. Name your shots.
+
+**`cmd` distinguishes three outcomes, and `ok` is not one of them.** `ok` means the request was
+handled, the same as every verb. Whether the *command* worked is `executed` and `success`: a command
+that fails to parse or throws never reaches the result callback (`executed: false`), one that runs
+and reports failure is `executed: true, success: false`, and only the third case worked. They used to
+look identical from outside, which is how an unattended run gets a clean pass from a command that did
+nothing. `result` is the command's own integer - `time query gametime` returns the tick count -
+previously recoverable only by parsing English out of `output`.
+
+`gamebridge cmd` warns on stderr and still exits 0, because reporting failure is an ordinary outcome
+for plenty of commands and a passing script should not start dying on them. `--strict` is the gate
+for a run that wants one. Over RCON the fields are absent rather than guessed: that protocol returns
+the printed text and nothing else.
 
 **A sized shot re-lays-out an open GUI, and now says so.** Resizing the window for the capture
 changes the GUI scale with it: measured, a screen reporting 480x270 in a 1920x1080 window came back
