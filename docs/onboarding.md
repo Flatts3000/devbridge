@@ -134,13 +134,20 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 **A toggle verb with no argument restores what vanilla does.** `hud on`, `input on`, `pause on` all
 put the game back; `off` gives you the devbridge behaviour.
 
-## Four things that will bite
+## Things that will bite
 
 **Connect to `localhost`, never the `127.0.0.1` literal.** The mod binds
 `InetAddress.getLoopbackAddress()`, which on a JVM that prefers IPv6 is `::1`. Dialling the IPv4
 literal then gets "connection refused" from a socket the log says is listening. For the same reason
 `ports check` cannot see a devbridge listener at all, so a port registry may report it free while a
 game is holding it.
+
+**The bridge only exists while a world is loaded.** The socket belongs to the integrated server, so
+there is nothing listening at the title screen and nothing that can drive world selection or the
+options menus. Quitting to the menu takes the bridge with it, and the symptom is a refused socket
+from a process that is still very much running - which `ps` will report as running, because it can
+tell the game is alive and not what screen it is on. `stop` closes the world and quits the game
+together for the same reason.
 
 **Commands run as the console unless you pass a `player`.** The console has no entity and sits at
 world spawn, so `@s` matches nothing and `~` is spawn-relative. A function ending in `tp @s ...`

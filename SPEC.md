@@ -171,6 +171,14 @@ by running exactly that sequence against the Trashlands pack: launch, `cmd` as `
   including real `Motion` for a player, which is worth stating because movement is
   client-authoritative and it could easily have read zero. `look` reports the camera and the
   crosshair hit precisely because those two are the residue that no command reaches.
+- **The title screen, and anything reached from it.** The socket belongs to the integrated server,
+  which exists only while a world is loaded, so nothing answers at the main menu: no driving world
+  selection, the options screens, or a mod's config screen reached from there. `stop` ends the world
+  and the game together for the same reason. A client-side socket outliving the world would be a
+  second listener with a second lifecycle, which is a larger thing than the gap justifies. It does
+  bound what `screen` can ever see: vanilla's options and world-select screens are the ones that nest
+  widgets inside an `AbstractSelectionList`, so the recursive half of the widget walk cannot be
+  exercised from in-world at all.
 - **Running in production.** Not a debug tool for shipped mods, not a server admin tool. RCON exists.
 - **Rendering without a window.** Minecraft needs a real GL context; there is no headless client. The
   window opens, it just does not need anybody looking at it.
