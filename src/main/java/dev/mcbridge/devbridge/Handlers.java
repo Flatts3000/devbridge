@@ -183,9 +183,30 @@ final class Handlers {
      * failure. Collecting it needs a {@link CommandSource} that keeps messages instead of the default
      * that drops them on the floor.
      */
+    /**
+     * What the command reported, if it got as far as reporting anything.
+     *
+     * <p>Written on the server thread and read on the socket thread after the future completes, so
+     * the fields are volatile rather than plain: the future's completion is the only thing ordering
+     * the two, and it orders the write of {@code done} rather than these.
+     */
+    private static final class Outcome {
+        private volatile boolean executed;
+        private volatile boolean success;
+        private volatile int result;
+
+        void set(boolean commandSucceeded, int commandResult) {
+            this.success = commandSucceeded;
+            this.result = commandResult;
+            // Last, so a reader that sees `executed` sees the other two set.
+            this.executed = true;
+        }
+    }
+
     private static JsonObject command(MinecraftServer server, String command, String playerName)
             throws Exception {
         List<String> messages = new CopyOnWriteArrayList<>();
+        Outcome outcome = new Outcome();
         CommandSource sink = new CommandSource() {
             @Override
             public void sendSystemMessage(Component message) {
@@ -231,7 +252,12 @@ final class Handlers {
                     }
                     stack = player.createCommandSourceStack();
                 }
-                stack = stack.withSource(sink);
+                // The result, which performPrefixedCommand otherwise drops on the floor.
+                // ExecutionCommandSource.resultConsumer() routes every execution through the
+                // source's own callback, so attaching one here is enough. The EMPTY callback
+                // performCommand passes to queueInitialCommandExecution looks like it would defeat
+                // this and does not: that one is the top frame's return callback, a different thing.
+                stack = stack.withSource(sink).withCallback(outcome::set);
                 server.getCommands().performPrefixedCommand(stack, command.replaceFirst("^/", ""));
                 done.complete(null);
             } catch (Throwable t) {
@@ -242,6 +268,16 @@ final class Handlers {
 
         JsonObject reply = ok();
         reply.addProperty("output", String.join("\n", messages));
+        // Three outcomes, not two. A command that never executed - one that failed to parse, or threw
+        // a CommandSyntaxException, both of which send a message and skip the callback - is a
+        // different thing from one that ran and reported failure, and a caller chasing a silent
+        // no-op wants to know which it got. `ok` keeps meaning "the request was handled", as it does
+        // for every other verb.
+        reply.addProperty("executed", outcome.executed);
+        reply.addProperty("success", outcome.executed && outcome.success);
+        if (outcome.executed) {
+            reply.addProperty("result", outcome.result);
+        }
         return reply;
     }
 }

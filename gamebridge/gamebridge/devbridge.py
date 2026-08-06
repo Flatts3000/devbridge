@@ -73,11 +73,30 @@ class DevBridge:
 
     # -------------------------------------------------------------- verbs
 
-    def command(self, line: str, player: str | None = None) -> str:
+    def run(self, line: str, player: str | None = None) -> dict:
+        """Run one command and return the whole reply, not just what it printed.
+
+        `executed` is whether the command ran at all: a command that fails to parse, or throws,
+        sends its message and never reaches the callback that reports a result. `success` is what it
+        reported when it did run, and `result` is its integer - the value several commands actually
+        return, like the tick count from `time query gametime`, which was previously only recoverable
+        by parsing English out of `output`.
+
+        Three outcomes rather than two, and the middle one is the one worth having: a command that
+        ran and reported failure looks exactly like a success from outside.
+        """
         payload = {"verb": "cmd", "command": line}
         if player is not None:
             payload["player"] = player
-        return self.request(**payload).get("output", "")
+        return self.request(**payload)
+
+    def command(self, line: str, player: str | None = None) -> str:
+        """Run one command and return what it printed.
+
+        Kept returning a string because `rcon.command` returns one too, and the CLI treats the two
+        transports as interchangeable. Use `run` for whether it worked.
+        """
+        return self.run(line, player).get("output", "")
 
     def script(self, lines, player: str | None = None) -> list[tuple[str, str]]:
         out = []

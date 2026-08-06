@@ -155,9 +155,19 @@ bridge: the client exited. It was pid 27480, launched from C:/.../Instances/Your
 looking for that port in the process's command line, not by the pid alone, so a recycled pid
 belonging to something unrelated reads as exited rather than as a healthy game.
 
-**A command that throws still reports success.** `cmd` returns what the command printed, and a
-failure deep inside a mod usually prints nothing, so an unattended run reports a clean pass for a
-scene that is not there. Bracket the run instead:
+**A command that fails no longer reports success.** `cmd` returns `executed` and `success` beside
+the output: a command that failed to parse or threw never ran (`executed: false`), one that ran and
+reported failure is `success: false`, and `result` carries its integer - `time query gametime` gives
+you the tick count directly. `gamebridge cmd` warns on stderr when a command did not work and still
+exits 0, since reporting failure is normal for many commands; pass `--strict` to make it a gate:
+
+```bash
+gamebridge --devbridge "$PORT" --player @s cmd "function yourpack:showcase/hall" --strict
+```
+
+**That still does not catch everything, so bracket the run as well.** `success` is what the command
+reported, and a failure deep inside a mod often reports nothing at all - the command succeeds and the
+scene is not there. The log is the backstop:
 
 ```bash
 MARK=$(gamebridge --json --devbridge "$PORT" log --level ERROR | python -c "import json,sys; print(json.load(sys.stdin)['marker'])")
@@ -165,12 +175,13 @@ gamebridge --devbridge "$PORT" --player @s cmd "function yourpack:showcase/hall"
 gamebridge --devbridge "$PORT" log --since "$MARK" --level ERROR --fail-on-error
 ```
 
+`log` reads the log file rather than asking the game, so it also works on a game that has already
+died - which is exactly when you most want it.
+
 **`--json` is the surface to script against.** Every command takes it, and it prints the reply object
 instead of a sentence. Sentences here get reworded whenever one turns out not to say what actually
 went wrong, and a caller matching on them breaks when that happens.
 
-It reads the log file rather than asking the game, so it also works on a game that has already
-died - which is exactly when you most want it.
 
 **Photographing a GUI takes two steps, and the coordinates are not pixels.** `screen` reports the
 open screen's width and height in GUI-scaled units, which is the space `cursor` and `click` work in;

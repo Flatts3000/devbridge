@@ -136,11 +136,38 @@ def cmd_wait(args) -> int:
 
 
 def cmd_run(args) -> int:
+    """Run one command. Over devbridge it also says whether the command worked."""
     with connect(args) as rcon:
-        output = (rcon.command(args.command, args.player)
-                  if args.player and hasattr(rcon, "hud") else rcon.command(args.command))
-    emit(args, {"output": output}, output or None)
-    return 0
+        if hasattr(rcon, "run"):
+            reply = rcon.run(args.command, args.player if args.player else None)
+        else:
+            # RCON genuinely cannot answer this: the protocol returns the printed text and nothing
+            # else. Absent fields rather than invented ones.
+            reply = {"output": rcon.command(args.command)}
+    emit(args, reply, reply.get("output") or None)
+    return report_command_outcome(args, reply)
+
+
+def report_command_outcome(args, reply: dict) -> int:
+    """Say when a command did not work, and exit non-zero only if asked to.
+
+    **Exit code stays 0 by default on purpose.** Plenty of commands report failure as an ordinary
+    outcome - `kill @e[type=cow]` with no cows around - and a script that has been running fine would
+    start dying on those. So the default surfaces it on stderr, where a person sees it and a pipeline
+    does not eat it, and `--strict` is there for an unattended run that wants the gate. That is the
+    same call `click` makes: report the observation, let the caller decide it is a verdict.
+    """
+    if "executed" not in reply:
+        return 0
+    if not reply["executed"]:
+        note = ("the command did not run at all - it failed to parse, or threw. Its message is in "
+                "the output above")
+    elif not reply.get("success"):
+        note = "the command ran and reported failure"
+    else:
+        return 0
+    print(f"warning: {note}", file=sys.stderr)
+    return 1 if getattr(args, "strict", False) else 0
 
 
 def cmd_script(args) -> int:
@@ -683,6 +710,11 @@ def main(argv: list[str] | None = None) -> int:
 
     run = subs.add_parser("cmd", help="run one command")
     run.add_argument("command")
+    run.add_argument("--strict", action="store_true",
+                     help="exit non-zero if the command did not succeed. Off by default because "
+                          "reporting failure is an ordinary outcome for plenty of commands, and a "
+                          "run that has been passing should not start failing on those. devbridge "
+                          "only; RCON cannot tell")
     run.set_defaults(func=cmd_run)
 
     script = subs.add_parser("script", help="run a file of commands")

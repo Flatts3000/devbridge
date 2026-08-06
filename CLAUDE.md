@@ -168,6 +168,14 @@ tracker.
   for the next tick, and `/tick sprint` - a server that never idles, the one case where the tick-wait
   reasoning could have held - measures the same. A `batch` verb was proposed and closed on those
   numbers (#19).
+- **A command's result is reachable, and the obvious reason to think otherwise is a red herring.**
+  `performCommand` passes `CommandResultCallback.EMPTY` to `queueInitialCommandExecution`, which
+  looks like it discards any callback you attach. That argument is the top frame's *return*
+  callback; the source's own callback is invoked separately, by
+  `ExecutionCommandSource.resultConsumer()`, so `stack.withCallback(...)` does fire. A command that
+  fails to parse or throws never reaches it - `finishParsing` returns null, and
+  `CommandSourceStack.handleError` sends the message without calling back - which is what makes
+  "never executed" distinguishable from "executed and failed".
 - **Ask the screen where its widgets are; do not derive coordinates.** `screen` lists them because
   layout arithmetic is somebody else's business and it breaks silently: deriving vanilla's Respawn
   button from `height / 4 + 72` gives 132, which is the button's *top edge*, and it worked only
