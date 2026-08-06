@@ -138,6 +138,15 @@ tracker.
   `message` (the chat component's text) and `dir` only, because the timestamped default name is chosen
   inside `Screenshot.grab` and never handed back. README and SPEC show the named case; do not assume
   `path` is always present.
+- **A player request borrows the player, not the player's permissions.** `cmd` always builds from
+  `server.createCommandSourceStack()` (which is `LevelBasedPermissionSet.OWNER`) and then attaches
+  the player's entity, dimension, position and rotation.
+  `ServerPlayer.createCommandSourceStack()` uses `this.permissions()` instead, which is level 0 in a
+  world without cheats, and Brigadier hides commands a source cannot run - so `time set noon` came
+  back as "Unknown or incomplete command", pointing at the syntax of a command that exists. It only
+  bites in worlds with cheats off, which is how it survived a full session of use in one with them
+  on. `withLevel` is not optional in that chain: `withEntity` keeps the stack's existing level, so
+  without it a player in the Nether runs commands against the respawn dimension.
 - **Commands run as the console unless the request names a `player`.** The console stack has no
   entity and sits at world spawn, so `@s` matches nothing and `~` is spawn-relative: a function
   ending in `tp @s ...` places its scene correctly and silently fails to move the camera. With a

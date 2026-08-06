@@ -154,6 +154,11 @@ world spawn, so `@s` matches nothing and `~` is spawn-relative. A function endin
 will place its scene perfectly and silently not move the camera. Pass `--player @s`, which takes the
 only player online.
 
+`--player` borrows the player's entity, dimension, position and rotation, and keeps the console's
+permission level. That matters in a world with cheats off, where the player is level 0: until 0.4.1
+the player path inherited that level, and every gated command came back as "Unknown or incomplete
+command" - Brigadier hides what a source cannot run, so a real command reads as a typo.
+
 **A dead game used to look like a refused socket.** `launch` records what it started, so anything
 that fails to connect afterwards says which of the three things happened rather than leaving you to
 work it out:
