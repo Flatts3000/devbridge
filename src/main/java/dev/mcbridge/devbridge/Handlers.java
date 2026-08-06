@@ -233,24 +233,38 @@ final class Handlers {
         server.execute(() -> {
             try {
                 // NOT withSuppressedOutput(): that is exactly the switch that would stop the
-                // messages this method exists to collect. createCommandSourceStack already carries
-                // LevelBasedPermissionSet.OWNER, so no permission call is needed either.
+                // messages this method exists to collect. The server's createCommandSourceStack
+                // already carries LevelBasedPermissionSet.OWNER, so no permission call is needed.
                 //
                 // AS A PLAYER WHEN ASKED, and this is not a nicety. The console's stack has no entity
                 // and sits at world spawn, so `@s` matches nothing and `~` is spawn-relative. A
                 // function ending in `tp @s` then places everything correctly and silently fails to
                 // move the camera, which reads as the command having half-worked.
-                CommandSourceStack stack;
-                if (playerName == null) {
-                    stack = server.createCommandSourceStack();
-                } else {
+                //
+                // BUT ALWAYS FROM THE SERVER'S STACK, borrowing only the player's entity, dimension,
+                // position and rotation. ServerPlayer.createCommandSourceStack() builds with
+                // `this.permissions()`, which in a world without cheats is level 0, and Brigadier
+                // hides commands a source cannot run - so `time set noon` came back as "Unknown or
+                // incomplete command", pointing at the syntax of a command that exists. The tool's
+                // own advice is to pass a player, so the fix for one problem silently caused a worse
+                // one, and only in worlds with cheats off, which is why it survived a session of use
+                // in a world with them on.
+                //
+                // The dimension is not optional either: the console stack sits in the respawn
+                // dimension, so a player in the Nether would otherwise have `~` resolved against the
+                // overworld.
+                CommandSourceStack stack = server.createCommandSourceStack();
+                if (playerName != null) {
                     ServerPlayer player = findPlayer(server, playerName);
                     if (player == null) {
                         done.completeExceptionally(
                             new IllegalArgumentException("no player named '" + playerName + "'"));
                         return;
                     }
-                    stack = player.createCommandSourceStack();
+                    stack = stack.withEntity(player)
+                        .withLevel(player.level())
+                        .withPosition(player.position())
+                        .withRotation(player.getRotationVector());
                 }
                 // The result, which performPrefixedCommand otherwise drops on the floor.
                 // ExecutionCommandSource.resultConsumer() routes every execution through the
