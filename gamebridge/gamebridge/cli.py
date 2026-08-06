@@ -679,29 +679,82 @@ def cmd_probe(args) -> int:
     return 0
 
 
+#: `check` found the world in the wrong state. The assertion is fine; the thing it describes is not.
+CHECK_FAILED = 1
+#: The condition itself could not be evaluated - a typo in a block id, a malformed selector. Its own
+#: code because it is a different problem with a different fix, and a verifier that cannot tell them
+#: apart reports a broken test as a broken world.
+CHECK_BROKEN = 2
+
+
 def cmd_check(args) -> int:
     """Assert a condition about the world, and exit non-zero when it does not hold.
 
-    Wraps `execute if`, whose replies are the only machine-readable answers the server gives: it says
-    "Test passed", optionally with "Count: n", or "Test failed". That turns scene verification into
-    something a script can gate on rather than something a person squints at in a screenshot.
+    Wraps `execute if`, which answers in two ways at once. The reply text says "Test passed",
+    optionally with "Count: n", or "Test failed" - and the command's own result says the same thing
+    as a number, which is what this reads over devbridge.
+
+    **Matching on the text was the tool doing what it tells callers not to do.** `--json` exists
+    because sentences get reworded when they turn out not to say what actually went wrong, so gating
+    the one verb scripts gate on against `startswith("Test passed")` was a standing invitation for a
+    version bump to break every verifier at once. `success` and `result` mean the same thing without
+    the string surgery: measured, `Count: 3` and `result: 3` are the same number.
+
+    RCON keeps the text parse, because RCON has no fields and genuinely cannot answer otherwise.
+
+    **A condition that will not parse is not a failed assertion.** A typo in a block id used to print
+    `FAIL execute if block ~ ~ ~ minecraft:not_a_blok` and exit 1, which reads as "the scene is
+    wrong" when the truth is "the test is wrong" - the worst thing a verifier can be confused about.
+    That is `executed: false`, and it exits 2.
+
+    What the fields cannot separate, and this is deliberate rather than missed: a condition that is
+    false, and one the server refused at runtime because the position is unloaded or outside the
+    world, are both `success: false` with `result: 0`. Only the text differs, so the reply text is
+    surfaced on failure rather than gated on - an unloaded chunk is the most likely reason a check
+    that should pass does not.
     """
     with connect(args) as rcon:
-        output = rcon.command(f"execute if {args.condition}")
-    passed = output.startswith("Test passed")
+        if hasattr(rcon, "run"):
+            reply = rcon.run(f"execute if {args.condition}", args.player if args.player else None)
+        else:
+            reply = {"output": rcon.command(f"execute if {args.condition}")}
+    output = reply.get("output", "")
 
-    count = None
-    if "Count:" in output:
-        count = int(output.rsplit("Count:", 1)[1].strip().rstrip("."))
+    if "success" in reply:
+        if not reply["executed"]:
+            emit(args, {"condition": args.condition, "passed": False, "broken": True,
+                        "count": None, "expected": args.count, "output": output},
+                 f"BROKEN {args.condition}")
+            print(f"warning: that condition could not be evaluated, so this is not a statement "
+                  f"about the world: {output.splitlines()[0] if output else 'no message'}",
+                  file=sys.stderr)
+            return CHECK_BROKEN
+        passed = reply["success"]
+        # The command's own result. A tally for the forms that count - `if entity`, `if items`,
+        # `if function` - and 1 or 0 for the ones that only answer yes or no.
+        count = reply.get("result")
+    else:
+        passed = output.startswith("Test passed")
+        count = None
+        if "Count:" in output:
+            count = int(output.rsplit("Count:", 1)[1].strip().rstrip("."))
+
+    held = passed
     if args.count is not None:
         passed = passed and count == args.count
 
     label = "ok  " if passed else "FAIL"
     expected = "" if args.count is None else f" (wanted {args.count}, got {count})"
-    emit(args, {"condition": args.condition, "passed": passed, "count": count,
+    emit(args, {"condition": args.condition, "passed": passed, "broken": False, "count": count,
                 "expected": args.count, "output": output},
          f"{label} {args.condition}{expected}")
-    return 0 if passed else 1
+    # Keyed on the condition, not on the verdict. A `--count` mismatch fails while the condition
+    # itself held, and echoing its "Test passed" under a FAIL line reads as the tool contradicting
+    # itself. Otherwise this is the message and not a gate: "that position is not loaded" is the
+    # most likely reason a check that should pass does not, and it is invisible in a bare FAIL.
+    if not held and output and not output.startswith("Test failed"):
+        print(f"note: {output.splitlines()[0]}", file=sys.stderr)
+    return 0 if passed else CHECK_FAILED
 
 
 def main(argv: list[str] | None = None) -> int:
