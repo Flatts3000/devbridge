@@ -116,8 +116,9 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 
 | Command | What it does |
 |---|---|
+| `wait` | Block until the server answers, so a script does not race a game that is still starting |
 | `ping` | Handshake: protocol version, which side answered, and the client's pause and input state |
-| `cmd` | Run one command and return what it printed. Takes an optional `player` |
+| `cmd` | Run one command: what it printed, whether it ran, and whether it worked. Takes an optional `player`; `--strict` exits non-zero when it did not succeed |
 | `shot` | Screenshot, written before the reply comes back. `--width`/`--height` capture at an exact size |
 | `hud` | Show or hide the HUD |
 | `input` | Hand the mouse back, or take it |
@@ -165,7 +166,7 @@ will place its scene perfectly and silently not move the camera. Pass `--player 
 only player online.
 
 `--player` borrows the player's entity, dimension, position and rotation, and keeps the console's
-permission level. That matters in a world with cheats off, where the player is level 0: until 0.4.1
+permission level. That matters in a world with cheats off, where the player is level 0: until 0.5.0
 the player path inherited that level, and every gated command came back as "Unknown or incomplete
 command" - Brigadier hides what a source cannot run, so a real command reads as a typo.
 
@@ -310,6 +311,9 @@ gamebridge launch --instance "$INSTANCE" --port "$PORT" -D devbridge.lockInput=t
 | A clean pass that describes the wrong world | Two projects sharing a port. `ping` reports which side answered |
 | A command placed things but the camera did not move | Ran as the console; pass a `player` |
 | `launch` refuses with missing classpath entries | Launch the instance once from the app so it fetches what it needs |
+| `launch` refuses before starting anything | No devbridge jar in the instance's `mods/`, or two of them |
+| A gated command answers "Unknown or incomplete command" | Fixed in 0.5.0. Before it, `--player` ran at the player's permission level, which is 0 in a world with cheats off |
+| `check` exits 2 | The condition could not be evaluated - a typo in a block id, a malformed selector. This is not a statement about the world |
 
 ## Never ship it
 

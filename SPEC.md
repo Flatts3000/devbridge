@@ -139,6 +139,12 @@ built on it. **Everything that touches the client is devbridge-only** - `screens
 originally said only `screenshot` was devbridge-only, which stopped being true as the client verbs
 were added.)
 
+**The transports are no longer equal in what they can report, and the CLI says so rather than
+guessing.** `cmd` over devbridge carries `executed`, `success` and the command's integer `result`;
+RCON returns the printed text and nothing else, so those fields are absent there rather than
+invented. Everything built on `cmd` inherits the split: `check` gates on `success` over devbridge and
+on the reply text over RCON, and `script` can mark which line failed only over devbridge.
+
 `launch` is not a verb at all. It starts the game, so there is nothing listening yet to send it to;
 it lives only in the CLI. See section 7, phase 4.
 
@@ -216,6 +222,22 @@ Two more, from driving GUIs rather than from shooting scenes:
   Coordinates measured off such an image point elsewhere the moment the window is itself again.
   Fixed by reporting both layouts and a `guiRelayout` flag rather than by refusing the shot, since
   widget bounds now make measuring off an image unnecessary anyway.
+
+Two more, both found by using the tool rather than by reading it, and both cases of the record
+agreeing with the wrong answer:
+
+- **`--player` dropped every gated command to permission 0.** `ServerPlayer.createCommandSourceStack`
+  builds with the player's own permissions, which is level 0 in a world without cheats, and Brigadier
+  hides commands a source cannot run - so `time set noon` came back as "Unknown or incomplete
+  command", pointing at the syntax of a command that exists. `--player` is the documented fix for
+  `@s` matching nothing, so the tool's own advice was the thing that broke it. Fixed by always
+  building from the server's stack and borrowing only the player's entity, dimension, position and
+  rotation. It is invisible in a world with cheats on, where the player is already level 4, which is
+  why it survived a full session of use.
+- **The startup line named an address the socket had not bound.** It printed `127.0.0.1` while
+  `getLoopbackAddress()` had returned `::1`, so a readiness poll written to agree with the log got
+  connection refused from a socket that was serving. Fixed by logging
+  `socket.getLocalSocketAddress()`. A log that confirms a wrong guess is worse than no log.
 
 ## 10. Open
 

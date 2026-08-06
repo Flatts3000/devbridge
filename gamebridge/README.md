@@ -76,7 +76,11 @@ gamebridge --devbridge 8604 pause on                  restore vanilla pause-on-l
 ```
 
 `check` exits non-zero when the condition does not hold, so scene verification is something a script
-can gate on rather than something a person squints at in a screenshot.
+can gate on rather than something a person squints at in a screenshot. It exits **1** when the world
+is not as asserted and **2** when the condition itself could not be evaluated - a typo in a block id
+is a broken test, not a broken world, and a verifier that cannot tell those apart sends you to the
+wrong file. `cmd` and `script` take `--strict` for the same reason; `script --strict` also stops at
+the first line that did not succeed, since later lines assume the earlier ones worked.
 
 Connection settings are read from the server's own `server.properties`, found by walking up from the
 working directory. Nothing to configure and no password to keep in sync.
