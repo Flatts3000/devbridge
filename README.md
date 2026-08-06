@@ -173,6 +173,16 @@ lands inside the button by one pixel and stops being right the moment anything m
 click --text Respawn` cannot make that mistake, and survives a resize, a GUI scale change, and the
 mod rearranging its own screen.
 
+**What it can see is vanilla's widget tree, and some modded screens do not have one.** A screen that
+draws its own widgets reports an empty list - FTB Library mounts its whole hierarchy inside a
+`ScreenWrapper` whose vanilla `children()` is empty, so its quest book, chapter tabs and nodes are
+invisible here. That is honest rather than broken, and the awkward part is that FTB Quests is in a
+large share of packs, so the screen a pack author most wants to drive is the one enumeration cannot
+see. There is no generic way around it: vanilla's own hit test, `getChildAt`, walks the same
+`children()` list, so a "what is under this point" verb would be exactly as blind. Reaching those
+widgets means reflecting into the mod that drew them. For those screens, point with `cursor`, look
+with `shot`, and click by coordinate.
+
 Bounds are `null` for a child that reports no rectangle, rather than zeros that would send a click to
 the corner. `widgetsComplete` is `false` when the list was cut short by the depth or size cap - a
 truncated list that claimed to be whole is how you conclude a button does not exist.

@@ -244,7 +244,10 @@ else's layout, and it breaks silently - on a resize, a GUI scale change, or the 
 button, it does not fail, it clicks whatever moved into that spot.
 
 A screen that draws without widgets reports an empty list, which is the honest answer and still more
-than the old silence. `LIST TRUNCATED` means the depth or size cap cut the walk short, so a missing
+than the old silence. Some modded screens are like that by construction: FTB Library mounts its own
+widget hierarchy inside a vanilla `ScreenWrapper` with no vanilla children, so an FTB Quests book
+enumerates as empty. Nothing generic fixes it - vanilla's own `getChildAt` walks the same list - so
+for those screens, point with `cursor`, look with `shot`, and click by coordinate. `LIST TRUNCATED` means the depth or size cap cut the walk short, so a missing
 button may be there after all.
 
 Do not pass `--width/--height` to a GUI shot. Resizing re-lays-out the screen and changes the GUI
