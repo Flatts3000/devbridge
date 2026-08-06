@@ -51,13 +51,30 @@ def emit(args, payload: dict, human: str | None = None) -> None:
 
 
 def _version() -> str:
-    """The installed package's version, or a marker when running from a source tree.
+    """The version of the code that is actually running.
 
-    Read from installed metadata rather than a constant, so it cannot drift from pyproject.toml -
-    which is the same failure the protocol check exists to prevent, one layer up.
+    Read from pyproject.toml rather than a constant, so it cannot drift from the packaging - which is
+    the same failure the protocol check exists to prevent, one layer up.
+
+    **The checkout is asked first, and that is not a detail.** Under an editable install the metadata
+    is a snapshot from install time while the code is live from the source tree, so the two disagree
+    the moment the version is bumped: this repo's own metadata said 0.3.0 while running 0.4.0 code.
+    Reporting the stale number made `launch`'s jar check warn that a correctly matched pair was
+    mismatched, which is the false alarm that check is supposed to avoid, aimed squarely at the
+    people who develop this. Installed metadata remains the answer for an ordinary install, where
+    there is no checkout to ask.
     """
+    here = Path(__file__).resolve().parent.parent / "pyproject.toml"
     try:
-        from importlib.metadata import PackageNotFoundError, version
+        import tomllib
+        with here.open("rb") as handle:
+            found = tomllib.load(handle)["project"]
+        if found["name"] == "gamebridge":
+            return str(found["version"])
+    except Exception:
+        pass
+    try:
+        from importlib.metadata import version
         return version("gamebridge")
     except Exception:
         return "unknown (not installed)"
@@ -513,7 +530,8 @@ def cmd_launch(args) -> int:
     The last manual step in the loop. Everything after this already worked; starting the game was
     the part that needed a person.
     """
-    from .launch import LaunchError, build_command, explain_exit, launch, reset_world, verify
+    from .launch import (LaunchError, build_command, check_installed_mod, explain_exit, launch,
+                         reset_world, verify)
 
     instance = Path(args.instance)
 
@@ -556,6 +574,14 @@ def cmd_launch(args) -> int:
         for problem in problems:
             print(f"launch: {problem}", file=sys.stderr)
         sys.exit("launch: refusing to start with a classpath that does not resolve")
+
+    # Checked here rather than inside verify(), which is about the classpath resolving, and which
+    # --dry-run prints without acting on.
+    fatal, warning = check_installed_mod(instance, _version())
+    if warning:
+        print(f"launch: {warning}", file=sys.stderr)
+    if fatal:
+        sys.exit(f"launch: {fatal}")
 
     # The world is replaced only once everything else has passed. Doing it earlier deleted a world
     # and then failed on the instance path, which is a bad trade for a caller who mistyped a flag.
