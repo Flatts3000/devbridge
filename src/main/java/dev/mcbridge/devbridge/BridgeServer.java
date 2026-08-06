@@ -50,10 +50,18 @@ final class BridgeServer extends Thread {
             // Backlog 1 and an explicit loopback address. Both matter: see the class note.
             socket = new ServerSocket(port, 1, InetAddress.getLoopbackAddress());
         } catch (IOException e) {
-            DevBridge.LOGGER.error("devbridge could not listen on 127.0.0.1:{}", port, e);
+            DevBridge.LOGGER.error("devbridge could not listen on the loopback address, port {}",
+                port, e);
             return;
         }
-        DevBridge.LOGGER.info("devbridge listening on 127.0.0.1:{}", port);
+        // The address actually bound, never a literal. getLoopbackAddress() resolves to ::1 on a JVM
+        // that prefers IPv6, and the log used to claim 127.0.0.1 regardless - so a readiness poll
+        // written against the log, opening a plain IPv4 socket, got "connection refused" from a
+        // socket that was up and serving. The log agreeing with the wrong guess is what makes that
+        // cost an hour. A client dialling `localhost` is unaffected, because resolution walks every
+        // address and finds the one that answers.
+        DevBridge.LOGGER.info("devbridge listening on {} (dial localhost, not a literal: this may be"
+            + " IPv6)", socket.getLocalSocketAddress());
 
         while (running) {
             try (Socket client = socket.accept()) {

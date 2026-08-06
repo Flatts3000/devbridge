@@ -138,9 +138,17 @@ put the game back; `off` gives you the devbridge behaviour.
 
 **Connect to `localhost`, never the `127.0.0.1` literal.** The mod binds
 `InetAddress.getLoopbackAddress()`, which on a JVM that prefers IPv6 is `::1`. Dialling the IPv4
-literal then gets "connection refused" from a socket the log says is listening. For the same reason
-`ports check` cannot see a devbridge listener at all, so a port registry may report it free while a
-game is holding it.
+literal then gets "connection refused" from a socket that is up and serving. `localhost` is fine
+because resolution walks every address and finds the one that answers; a hand-rolled
+`socket.socket(); connect(("127.0.0.1", port))` readiness poll is not. The startup line names the
+address actually bound, so it will tell you which you have:
+
+```
+devbridge listening on localhost/[0:0:0:0:0:0:0:1]:8606 (dial localhost, not a literal: this may be IPv6)
+```
+
+For the same reason `ports check` cannot see a devbridge listener at all, so a port registry may
+report it free while a game is holding it.
 
 **The bridge only exists while a world is loaded.** The socket belongs to the integrated server, so
 there is nothing listening at the title screen and nothing that can drive world selection or the
