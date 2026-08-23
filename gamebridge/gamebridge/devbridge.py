@@ -169,7 +169,8 @@ class DevBridge:
         """
         return self.request(verb="click", x=x, y=y, button=button)
 
-    def use(self, offhand: bool = False, target: str = "auto") -> dict:
+    def use(self, offhand: bool = False, target: str = "auto",
+            wait_ms: int | None = None) -> dict:
         """Right-click: use what is held, the way a player would.
 
         This is how a GUI gets OPENED. `click` and `cursor` drive a screen that is already up and
@@ -182,12 +183,20 @@ class DevBridge:
         in front of something interactive - otherwise the block wins and you get a reply about the
         wrong thing.
 
+        A container's screen arrives a tick or two later, on a packet, so this WAITS for one rather
+        than sampling once - `wait_ms` caps that (0 to skip it). Without the wait every chest,
+        furnace and MenuProvider machine reported no screen on a use that worked perfectly.
+
         Gate on `openedScreen`, not on `consumed`. An item can consume the action and open nothing,
         and the reply names `held` and `heldName` so an empty or wrong hotbar slot is
         distinguishable from an item that opened nothing - from the outside those look identical,
         and telling them apart is most of why this verb reports as much as it does.
         """
-        return self.request(verb="use", offhand=offhand, target=target)
+        # The key is OMITTED rather than sent as null, which is this client's convention
+        # (see `screen`). Sending null makes `has("waitMs")` true on the other side while the
+        # value is JsonNull, and the mod threw UnsupportedOperationException on it.
+        return self.request(verb="use", offhand=offhand, target=target,
+                            **({} if wait_ms is None else {"waitMs": wait_ms}))
 
     def screenshot(self, name: str | None = None,
                    width: int | None = None, height: int | None = None) -> dict:

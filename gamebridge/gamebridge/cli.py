@@ -444,7 +444,7 @@ def cmd_use(args) -> int:
         sys.exit("--devbridge required: using an item is a client thing")
 
     with connect(args) as bridge:
-        reply = bridge.use(offhand=args.offhand, target=args.target)
+        reply = bridge.use(offhand=args.offhand, target=args.target, wait_ms=args.wait_ms)
 
     held = reply.get("heldName") or reply.get("held") or "nothing"
     opened = reply.get("screen")
@@ -932,6 +932,9 @@ def main(argv: list[str] | None = None) -> int:
                      help="auto (default) prefers whatever the crosshair is on, the way vanilla "
                           "does; item ignores it and uses the item in the air, which is what a book "
                           "wants while standing in front of something interactive")
+    use.add_argument("--wait-ms", type=int, default=None, dest="wait_ms",
+                     help="how long to wait for a screen afterwards (default 1500). A container's "
+                          "arrives a tick later on a packet, so sampling once misses every one")
     use.add_argument("--expect-screen", action="store_true",
                      help="exit non-zero if no screen opened. An empty hotbar slot and an item that "
                           "opens nothing look identical from outside, so say which you expected")

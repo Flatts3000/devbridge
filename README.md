@@ -140,6 +140,7 @@ One request per line, one reply per line.
 | `pause` | client render thread | optional `enabled` (default `true`) | `{"ok":true,"pauseOnLostFocus":true}` |
 | `screen` | client render thread | optional `open` | `{"ok":true,"screen":"...","title":"...","width":480,"height":270,"widgets":[...],"widgetsComplete":true}` |
 | `cursor` | client render thread | `x`, `y` (GUI-scaled) | `{"ok":true,"x":167,"y":144,"rawX":668,"rawY":576}` |
+| `use` | Right-click: use the held item. The only way to OPEN a GUI - `click` drives one that is already up. Names what was in hand, so an empty slot is distinguishable from an item that opened nothing, and waits for the screen because a container's arrives a tick later |
 | `click` | client render thread | `x`, `y`, optional `button` | `{"ok":true,"onPress":true,"onRelease":false,"handled":true,"screenBefore":"...","screen":"...","changedScreen":false}` |
 | `look` | client render thread | none | `{"ok":true,"camera":{"pos":[-5.5,72.62,-0.5],"yaw":0.0,"pitch":90.0,"fov":70.0,"detached":false,"entity":"minecraft:player"},"hit":{"type":"block","at":[...],"distance":1.62,"pos":[-6,70,-1],"face":"up","inside":false,"block":"minecraft:oak_stairs[facing=east,half=top,...]"}}` |
 | `stop` | either | none | `{"ok":true,"quits":true}` - closes the world, and on a client quits the game |
