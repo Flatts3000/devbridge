@@ -88,6 +88,15 @@ final class ClientHandlers {
         return ScreenDriver.click(x, y, button);
     }
 
+    static JsonObject use(MinecraftServer server, boolean offhand, String target) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a dedicated server has no hand to use "
+                + "and no screen to open. Item use is a client action; over RCON, the nearest thing "
+                + "is a command.");
+        }
+        return HandUse.use(offhand, target);
+    }
+
     static JsonObject look(MinecraftServer server) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: a server has no camera and no crosshair. "

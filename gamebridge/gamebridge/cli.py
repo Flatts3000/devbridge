@@ -438,6 +438,28 @@ def find_widget(bridge, text: str) -> dict:
     return hits[0]
 
 
+def cmd_use(args) -> int:
+    """Right-click: use what is held. Non-zero if nothing opened and one was expected."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: using an item is a client thing")
+
+    with connect(args) as bridge:
+        reply = bridge.use(offhand=args.offhand, target=args.target)
+
+    held = reply.get("heldName") or reply.get("held") or "nothing"
+    opened = reply.get("screen")
+    where = f", screen -> {opened.split('.')[-1]}" if opened else ""
+    emit(args, reply, f"used {held} against {reply.get('against')}"
+                      f" ({reply.get('result')}){where}")
+    # NON-ZERO ONLY WHEN A SCREEN WAS ASKED FOR AND DID NOT APPEAR, which is the whole point of
+    # --expect-screen. Without it this stays 0 like `click` does: plenty of legitimate uses open
+    # nothing at all, and a verb that failed on those would be useless for anything but books.
+    if args.expect_screen and not reply.get("openedScreen"):
+        print(f"expected a screen and none opened (held: {held})", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_click(args) -> int:
     """Press and release at a point, or on a named widget. Non-zero only if the request failed."""
     if args.devbridge is None:
@@ -903,6 +925,17 @@ def main(argv: list[str] | None = None) -> int:
                           "a GUI scale change, which a coordinate does not")
     clk.add_argument("--button", type=int, default=0, help="0 left, 1 right, 2 middle")
     clk.set_defaults(func=cmd_click)
+
+    use = subs.add_parser("use", help="right-click: use the held item, which is how a GUI is opened")
+    use.add_argument("--offhand", action="store_true", help="use the off hand")
+    use.add_argument("--target", choices=["auto", "item"], default="auto",
+                     help="auto (default) prefers whatever the crosshair is on, the way vanilla "
+                          "does; item ignores it and uses the item in the air, which is what a book "
+                          "wants while standing in front of something interactive")
+    use.add_argument("--expect-screen", action="store_true",
+                     help="exit non-zero if no screen opened. An empty hotbar slot and an item that "
+                          "opens nothing look identical from outside, so say which you expected")
+    use.set_defaults(func=cmd_use)
 
     ps = subs.add_parser("ps", help="what has been launched, and whether it is still running")
     ps.set_defaults(func=cmd_ps)

@@ -169,6 +169,26 @@ class DevBridge:
         """
         return self.request(verb="click", x=x, y=y, button=button)
 
+    def use(self, offhand: bool = False, target: str = "auto") -> dict:
+        """Right-click: use what is held, the way a player would.
+
+        This is how a GUI gets OPENED. `click` and `cursor` drive a screen that is already up and
+        refuse when none is; before this verb existed the only way in was synthesizing an OS-level
+        mouse event, which needs the game window foregrounded and silently does nothing when it is
+        not.
+
+        `target="auto"` mirrors vanilla: whatever the crosshair is on wins, and the item in the air
+        is the fallback. `target="item"` forces the item, which is what a book wants while standing
+        in front of something interactive - otherwise the block wins and you get a reply about the
+        wrong thing.
+
+        Gate on `openedScreen`, not on `consumed`. An item can consume the action and open nothing,
+        and the reply names `held` and `heldName` so an empty or wrong hotbar slot is
+        distinguishable from an item that opened nothing - from the outside those look identical,
+        and telling them apart is most of why this verb reports as much as it does.
+        """
+        return self.request(verb="use", offhand=offhand, target=target)
+
     def screenshot(self, name: str | None = None,
                    width: int | None = None, height: int | None = None) -> dict:
         """Capture, optionally at an exact size.
