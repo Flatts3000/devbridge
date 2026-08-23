@@ -71,6 +71,13 @@ final class Handlers {
             case "click" -> ClientHandlers.click(server,
                 request.get("x").getAsDouble(), request.get("y").getAsDouble(),
                 request.has("button") ? request.get("button").getAsInt() : 0);
+            case "use" -> ClientHandlers.use(server,
+                request.has("offhand") && request.get("offhand").getAsBoolean(),
+                request.has("target") ? request.get("target").getAsString() : "auto",
+                // NULL-SAFE, not just present-safe. A field sent as null makes has() true
+                // while the value is JsonNull, and getAsInt() on that throws.
+                request.has("waitMs") && !request.get("waitMs").isJsonNull()
+                    ? request.get("waitMs").getAsInt() : null);
             case "look" -> ClientHandlers.look(server);
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a

@@ -125,6 +125,7 @@ These are the CLI's subcommands. Most map to a protocol verb of the same name; `
 | `pause` | Restore pausing on lost focus, or turn it off |
 | `screen` | What GUI is open, what widgets are in it and where to click each, or open the inventory / close what is open |
 | `cursor` | Move the pointer, which is what makes a tooltip render |
+| `use` | Right-click: use the held item. The way a GUI gets opened, which `click` cannot do - it drives a screen that is already up. `--target item` ignores what the crosshair is on, which is what a book wants; `--expect-screen` exits non-zero if none appeared |
 | `click` | Press and release at a point, or on `--text NAME` from the widget list. What it returns is an observation, not a verdict; verify with `screen` or `shot` |
 | `look` | Where the camera is, and what block or entity the crosshair is on |
 | `script` | Run a file of commands, marking the ones that did not succeed. `--strict` stops at the first failure |
