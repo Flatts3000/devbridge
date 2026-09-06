@@ -107,6 +107,16 @@ final class ClientHandlers {
         return Mining.mine(timeoutMs);
     }
 
+    static JsonObject key(MinecraftServer server, String name, Integer holdTicks,
+                          boolean checkOnly) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a dedicated server has no keyboard. A "
+                + "keybind is a client thing by definition - what it triggers may reach the server, "
+                + "but the press cannot start there.");
+        }
+        return Keys.press(name, holdTicks, checkOnly);
+    }
+
     static JsonObject look(MinecraftServer server) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: a server has no camera and no crosshair. "

@@ -46,7 +46,7 @@ final class Handlers {
      * whole point of having it: a client reading the old meaning is quietly wrong rather than
      * broken, which is the failure this number exists to make loud.
      */
-    static final int PROTOCOL_VERSION = 3;
+    static final int PROTOCOL_VERSION = 4;
 
     private Handlers() {
     }
@@ -81,6 +81,10 @@ final class Handlers {
             case "mine" -> ClientHandlers.mine(server,
                 request.has("timeoutMs") && !request.get("timeoutMs").isJsonNull()
                     ? request.get("timeoutMs").getAsInt() : null);
+            case "key" -> ClientHandlers.key(server,
+                request.get("name").getAsString(),
+                request.has("holdTicks") ? request.get("holdTicks").getAsInt() : null,
+                request.has("check") && request.get("check").getAsBoolean());
             case "look" -> ClientHandlers.look(server);
             case "stop" -> stop(server);
             // An unknown verb fails loudly. Silently accepting a typo is the worst outcome for a

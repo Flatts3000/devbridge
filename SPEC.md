@@ -66,7 +66,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "C:/.../run/screenshots/museum.png", "dir": "C:/.../run/screenshots"}
 
 {"verb": "ping"}
-{"ok": true, "protocol": 3, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
+{"ok": true, "protocol": 4, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a
@@ -87,6 +87,7 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `use` | client render thread | Right-click: use the held item, which is how a GUI gets OPENED. `auto` prefers whatever the crosshair is on, the way vanilla does; `item` forces the item in the air. Names what was in hand, so an empty slot is distinguishable from an item that opened nothing |
 | `click` | client render thread | Press and release at a point. Reports what it saw, none of which is a verdict: screens over- and under-report, and consequences land asynchronously. Verify with `screen` or a picture |
 | `mine` | client render thread | Left-click and HELD: breaks what the crosshair is on, then reports whether it went and how long it took. Holding is the point - a single press does nothing to a block, and `click` cannot express duration. Drives `MultiPlayerGameMode` per tick rather than pressing the attack key, because vanilla only continues an attack while the mouse is grabbed and this bridge never grabs it |
+| `key` | client render thread | Presses a key, doing what `KeyboardHandler` does: `KeyMapping.set` then `KeyMapping.click`, which is the half `consumeClick` drains. Reports what the key is BOUND to, and that is the useful half - a press reaching nothing is indistinguishable from one that worked. `--check` reports the owners and presses nothing, which is how a free default binding is chosen |
 | `look` | client render thread | Where the camera is - which is not the player in third person or spectator - and what the crosshair is on, as a block with its full state or an entity. Reports nothing a command already answers: position, rotation, velocity and on-ground all come back from `data get entity` |
 | `stop` | either | Halts the world, and on a client quits the game. Quitting matters: a client left at the title screen keeps the world's file locks, and the next launch fails looking like a corrupt save |
 
@@ -236,6 +237,17 @@ agreeing with the wrong answer:
   building from the server's stack and borrowing only the player's entity, dimension, position and
   rotation. It is invisible in a world with cheats on, where the player is already level 4, which is
   why it survived a full session of use.
+- **A keybind was the last input a mod could ship and not test, and the first press found a bug.**
+  `cmd` reaches the server, `click` drives a GUI widget, `use` and `mine` reach the world; a feature
+  bound to a key had no call to make. The mod this was built for had bound itself to V on the belief
+  that vanilla does not use V. The first `key v` answered
+  `bound to key.debug.dumpVersion, key.flattsthings.toggle_auto_swap` - vanilla's F3 chords are
+  ordinary key mappings and collide for real. Hence `--check`, which reports a key's owners and
+  presses nothing: choosing a default binding by reasoning about which keys look free is guessing,
+  and the answer depends on what else is loaded. In a client with JEI, R, U and F are already taken.
+  Note this verb fakes input where `mine` deliberately does not, and the two are consistent: a
+  keybind is polled with `consumeClick` whatever the window is doing, while a held attack is gated
+  on the mouse being grabbed.
 - **Pressing the attack key mined nothing.** `mine` was first written as
   `KeyMapping.set(keyAttack)` plus a hold, which reads as exactly what a player does.
   `Minecraft.tick` continues an attack only while `this.mouseHandler.isMouseGrabbed()`, and this

@@ -460,6 +460,29 @@ def cmd_use(args) -> int:
     return 0
 
 
+def cmd_key(args) -> int:
+    """Press a key. Non-zero when nothing is bound to it, which is the failure worth catching."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: a keyboard is a client thing")
+
+    with connect(args) as bridge:
+        reply = bridge.key(args.name, hold_ticks=args.hold_ticks, check=args.check)
+
+    bound = reply.get("boundTo") or []
+    verb = "pressed" if reply.get("pressed") else "checked"
+    if bound:
+        emit(args, reply, f"{verb} {reply.get('key')}, bound to {', '.join(bound)}")
+        return 0
+    if args.check:
+        # Nothing bound is the ANSWER here, not a failure: this is how a free key is found.
+        emit(args, reply, f"{reply.get('key')} is free")
+        return 0
+    # A press that reaches nothing looks exactly like one that worked, so say so and fail. This is
+    # the whole reason the reply carries the binding list.
+    emit(args, reply, f"pressed {reply.get('key')} but NOTHING is bound to it")
+    return 1
+
+
 def cmd_mine(args) -> int:
     """Hold left mouse until the block breaks. Non-zero if it did not and one was expected."""
     if args.devbridge is None:
@@ -971,6 +994,16 @@ def main(argv: list[str] | None = None) -> int:
                            "tool is too weak, or that something is protecting the block, is a "
                            "legitimate call that must not look like an error")
     mine.set_defaults(func=cmd_mine)
+
+    key = subs.add_parser("key", help="press a key, so a keybind can be tested (devbridge only)")
+    key.add_argument("name", help="vanilla's name (key.keyboard.v) or just the key (v)")
+    key.add_argument("--check", action="store_true",
+                     help="report what the key is bound to and press nothing, which is how you "
+                          "find a free key without firing whatever owns it")
+    key.add_argument("--hold-ticks", type=int, default=None,
+                     help="hold it down this many ticks before releasing; omit for a tap, which is "
+                          "what a binding read with consumeClick wants")
+    key.set_defaults(func=cmd_key)
 
     ps = subs.add_parser("ps", help="what has been launched, and whether it is still running")
     ps.set_defaults(func=cmd_ps)

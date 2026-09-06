@@ -18,7 +18,7 @@ class DevBridgeError(RuntimeError):
 
 #: The wire protocol this client speaks. Must equal Handlers.PROTOCOL_VERSION in the mod, and
 #: .github/scripts/check_invariants.sh fails the build if the two drift.
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 
 
 class DevBridge:
@@ -168,6 +168,25 @@ class DevBridge:
         is an observable consequence and a better signal; a screenshot is better still.
         """
         return self.request(verb="click", x=x, y=y, button=button)
+
+    def key(self, name: str, hold_ticks: int | None = None, check: bool = False) -> dict:
+        """Press a key, the way vanilla's own keyboard handler does.
+
+        The last input a mod could ship and not test. `cmd` reaches the server, `click` drives a GUI
+        widget, `use` and `mine` reach the world; a feature bound to a key had no call to make. The
+        seams this covers all compile and all pass every headless test: a mapping registered in the
+        wrong category, bound to a key something else already owns, or polled from the wrong bus.
+
+        `name` takes vanilla's spelling (`key.keyboard.v`) or just `v`.
+
+        Returns `boundTo`, every mapping the key currently owns. **An empty list is the finding** -
+        it means the press reached nothing, which is otherwise indistinguishable from one that
+        worked.
+        """
+        # holdTicks is OMITTED rather than sent as null, this client's convention throughout: a
+        # null makes has() true on the other side while the value is JsonNull, and getAsInt throws.
+        return self.request(verb="key", name=name, check=check,
+                            **({} if hold_ticks is None else {"holdTicks": hold_ticks}))
 
     def mine(self, timeout_ms: int | None = None) -> dict:
         """Hold left mouse on whatever the crosshair is on, until it breaks or the time runs out.
