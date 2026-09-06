@@ -18,7 +18,7 @@ class DevBridgeError(RuntimeError):
 
 #: The wire protocol this client speaks. Must equal Handlers.PROTOCOL_VERSION in the mod, and
 #: .github/scripts/check_invariants.sh fails the build if the two drift.
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 
 
 class DevBridge:
@@ -168,6 +168,28 @@ class DevBridge:
         is an observable consequence and a better signal; a screenshot is better still.
         """
         return self.request(verb="click", x=x, y=y, button=button)
+
+    def mine(self, timeout_ms: int | None = None) -> dict:
+        """Hold left mouse on whatever the crosshair is on, until it breaks or the time runs out.
+
+        This is the verb `click` is not. `click` and `cursor` drive a GUI that is already open and
+        refuse when none is, so before this existed nothing about breaking a block was reachable
+        from outside: tool speed, durability, drops, dig progress, or simply "did it go".
+
+        Holds the real attack binding, so vanilla's own miss timer, swing, and input hooks all run.
+        The key is always released, including when this raises.
+
+        Returns the block that was there, the block there now, what was held, whether it broke, and
+        how long the button was down. `broke` compares the block against what was there rather than
+        against air, because a block can break into another block.
+
+        In creative everything breaks instantly whatever is held, so a caller measuring a tool wants
+        survival first.
+        """
+        # The key is OMITTED rather than sent as null, this client's convention throughout: a null
+        # makes has() true on the other side while the value is JsonNull, and getAsInt throws on it.
+        return self.request(verb="mine",
+                            **({} if timeout_ms is None else {"timeoutMs": timeout_ms}))
 
     def use(self, offhand: bool = False, target: str = "auto",
             wait_ms: int | None = None) -> dict:

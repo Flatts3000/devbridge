@@ -98,6 +98,15 @@ final class ClientHandlers {
         return HandUse.use(offhand, target, waitMs);
     }
 
+    static JsonObject mine(MinecraftServer server, Integer timeoutMs) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a dedicated server has no mouse to hold "
+                + "and no crosshair to hold it at. Breaking a block from a server is `cmd` with "
+                + "setblock, which is a different thing and does not exercise a tool.");
+        }
+        return Mining.mine(timeoutMs);
+    }
+
     static JsonObject look(MinecraftServer server) throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: a server has no camera and no crosshair. "

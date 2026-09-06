@@ -66,7 +66,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "C:/.../run/screenshots/museum.png", "dir": "C:/.../run/screenshots"}
 
 {"verb": "ping"}
-{"ok": true, "protocol": 2, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
+{"ok": true, "protocol": 3, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a
@@ -86,6 +86,7 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `cursor` | client render thread | Moves the pointer, which is what renders a tooltip. Moves the real OS cursor, not just the screen's idea of it |
 | `use` | client render thread | Right-click: use the held item, which is how a GUI gets OPENED. `auto` prefers whatever the crosshair is on, the way vanilla does; `item` forces the item in the air. Names what was in hand, so an empty slot is distinguishable from an item that opened nothing |
 | `click` | client render thread | Press and release at a point. Reports what it saw, none of which is a verdict: screens over- and under-report, and consequences land asynchronously. Verify with `screen` or a picture |
+| `mine` | client render thread | Left-click and HELD: breaks what the crosshair is on, then reports whether it went and how long it took. Holding is the point - a single press does nothing to a block, and `click` cannot express duration. Drives `MultiPlayerGameMode` per tick rather than pressing the attack key, because vanilla only continues an attack while the mouse is grabbed and this bridge never grabs it |
 | `look` | client render thread | Where the camera is - which is not the player in third person or spectator - and what the crosshair is on, as a block with its full state or an entity. Reports nothing a command already answers: position, rotation, velocity and on-ground all come back from `data get entity` |
 | `stop` | either | Halts the world, and on a client quits the game. Quitting matters: a client left at the title screen keeps the world's file locks, and the next launch fails looking like a corrupt save |
 
@@ -235,6 +236,14 @@ agreeing with the wrong answer:
   building from the server's stack and borrowing only the player's entity, dimension, position and
   rotation. It is invisible in a world with cheats on, where the player is already level 4, which is
   why it survived a full session of use.
+- **Pressing the attack key mined nothing.** `mine` was first written as
+  `KeyMapping.set(keyAttack)` plus a hold, which reads as exactly what a player does.
+  `Minecraft.tick` continues an attack only while `this.mouseHandler.isMouseGrabbed()`, and this
+  bridge deliberately never grabs the mouse, so the key was held and the block was untouched with
+  nothing logged either way. Fixed by driving `MultiPlayerGameMode.continueDestroyBlock` from a
+  client tick handler instead of simulating input. The general shape: vanilla gates real input on
+  window focus, so anything that fakes a key press has to be checked against a block that actually
+  broke rather than against the call returning.
 - **The startup line named an address the socket had not bound.** It printed `127.0.0.1` while
   `getLoopbackAddress()` had returned `::1`, so a readiness poll written to agree with the log got
   connection refused from a socket that was serving. Fixed by logging

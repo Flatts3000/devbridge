@@ -460,6 +460,28 @@ def cmd_use(args) -> int:
     return 0
 
 
+def cmd_mine(args) -> int:
+    """Hold left mouse until the block breaks. Non-zero if it did not and one was expected."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: mining is a client thing")
+
+    with connect(args) as bridge:
+        reply = bridge.mine(timeout_ms=args.timeout_ms)
+
+    outcome = "broke" if reply.get("broke") else "did NOT break"
+    emit(args, reply, f"{outcome} {reply.get('block')} at "
+                      f"{reply.get('x')},{reply.get('y')},{reply.get('z')}"
+                      f" holding {reply.get('held')} after {reply.get('heldMs')}ms")
+    # Non-zero only when a break was asked for and did not happen, matching `use --expect-screen`.
+    # Plenty of legitimate calls are meant to fail to break: that is how you prove a tool is too
+    # weak, or that a protection plugin is holding.
+    if args.expect_broken and not reply.get("broke"):
+        print(f"expected {reply.get('block')} to break and it did not "
+              f"(held: {reply.get('held')})", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_click(args) -> int:
     """Press and release at a point, or on a named widget. Non-zero only if the request failed."""
     if args.devbridge is None:
@@ -939,6 +961,16 @@ def main(argv: list[str] | None = None) -> int:
                      help="exit non-zero if no screen opened. An empty hotbar slot and an item that "
                           "opens nothing look identical from outside, so say which you expected")
     use.set_defaults(func=cmd_use)
+
+    mine = subs.add_parser("mine", help="left-click and hold: break what the crosshair is on")
+    mine.add_argument("--timeout-ms", type=int, default=None, dest="timeout_ms",
+                      help="how long to hold before giving up (default 5000). The key is always "
+                           "released, including on failure")
+    mine.add_argument("--expect-broken", action="store_true",
+                      help="exit non-zero if the block did not break. Not the default: proving a "
+                           "tool is too weak, or that something is protecting the block, is a "
+                           "legitimate call that must not look like an error")
+    mine.set_defaults(func=cmd_mine)
 
     ps = subs.add_parser("ps", help="what has been launched, and whether it is still running")
     ps.set_defaults(func=cmd_ps)
