@@ -34,6 +34,14 @@ import net.minecraft.client.Minecraft;
  * the two verbs look inconsistent and are not - each drives the game at the lowest level that is
  * actually reached when a player does the thing.
  *
+ * <p><b>It presses key MAPPINGS, not keys, and the difference has teeth.</b> Escape, the F3 chords
+ * and anything else vanilla handles inside {@code KeyboardHandler.keyPress} are not key mappings, so
+ * this reaches none of them: {@code key escape} reports whatever mapping happens to share the key -
+ * JEI binds one - and the pause menu does not open. Driving those needs
+ * {@code KeyboardHandler.keyPress}, which is private and takes a {@code KeyEvent}, so it needs an
+ * access transformer. Worth doing when something actually needs it; recorded here so the next person
+ * does not spend the time finding out the same way.
+ *
  * <p><b>It reports what is bound to the key, and that is the useful half of the answer.</b> A press
  * that reaches nothing is the failure worth catching, and it is indistinguishable from a press that
  * worked unless the reply says which mappings the key actually owns. An empty list is a finding.
