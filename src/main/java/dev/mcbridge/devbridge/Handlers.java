@@ -39,6 +39,12 @@ final class Handlers {
      * client lives in this repo: before it did, three verbs and two ping fields were added here with
      * nothing to notice that the client could not speak them.
      *
+     * <p>It went to 3 and then 4 in this branch before being put back. {@code mine}, {@code key} and
+     * {@code screen}'s {@code filter} are all additive: nothing an older client already sends
+     * changed meaning, so by the rule above none of them earns a bump, and bumping anyway would have
+     * hard-failed every installed client for no semantic change. Recorded because the mistake was
+     * made twice in one branch by the person who wrote the rule.
+     *
      * <p><b>2</b> - {@code click}'s {@code handled} changed meaning. It was {@code mouseClicked}'s
      * return alone; it is now that or {@code mouseReleased}, so a click taken on release reports
      * true where it used to report false. Everything else since 1 was additive and would not have
@@ -46,7 +52,7 @@ final class Handlers {
      * whole point of having it: a client reading the old meaning is quietly wrong rather than
      * broken, which is the failure this number exists to make loud.
      */
-    static final int PROTOCOL_VERSION = 4;
+    static final int PROTOCOL_VERSION = 2;
 
     private Handlers() {
     }
@@ -84,7 +90,8 @@ final class Handlers {
                     ? request.get("timeoutMs").getAsInt() : null);
             case "key" -> ClientHandlers.key(server,
                 request.get("name").getAsString(),
-                request.has("holdTicks") ? request.get("holdTicks").getAsInt() : null,
+                request.has("holdTicks") && !request.get("holdTicks").isJsonNull()
+                    ? request.get("holdTicks").getAsInt() : null,
                 request.has("check") && request.get("check").getAsBoolean());
             case "look" -> ClientHandlers.look(server);
             case "stop" -> stop(server);

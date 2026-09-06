@@ -18,7 +18,7 @@ class DevBridgeError(RuntimeError):
 
 #: The wire protocol this client speaks. Must equal Handlers.PROTOCOL_VERSION in the mod, and
 #: .github/scripts/check_invariants.sh fails the build if the two drift.
-PROTOCOL_VERSION = 4
+PROTOCOL_VERSION = 2
 
 
 class DevBridge:
@@ -197,8 +197,12 @@ class DevBridge:
         refuse when none is, so before this existed nothing about breaking a block was reachable
         from outside: tool speed, durability, drops, dig progress, or simply "did it go".
 
-        Holds the real attack binding, so vanilla's own miss timer, swing, and input hooks all run.
-        The key is always released, including when this raises.
+        Drives MultiPlayerGameMode's destroy loop once per client tick, following the crosshair the
+        way a held mouse button does. It does NOT hold the attack binding: Minecraft.tick gates a
+        held attack on the mouse being grabbed, and this bridge never grabs it, so that path mines
+        nothing. The miss timer and the swing animation are skipped with it - neither affects
+        whether a block breaks, but do not read a timing from here as proof the vanilla input path
+        ran. The dig is always stopped, including when this raises.
 
         Returns the block that was there, the block there now, what was held, whether it broke, and
         how long the button was down. `broke` compares the block against what was there rather than

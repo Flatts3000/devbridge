@@ -462,7 +462,7 @@ def cmd_use(args) -> int:
 
 
 def cmd_key(args) -> int:
-    """Press a key. Non-zero when nothing is bound to it, which is the failure worth catching."""
+    """Press a key. Reports what the key is bound to; --expect-bound asserts there is something."""
     if args.devbridge is None:
         sys.exit("--devbridge required: a keyboard is a client thing")
 
@@ -471,17 +471,20 @@ def cmd_key(args) -> int:
 
     bound = reply.get("boundTo") or []
     verb = "pressed" if reply.get("pressed") else "checked"
-    if bound:
-        emit(args, reply, f"{verb} {reply.get('key')}, bound to {', '.join(bound)}")
-        return 0
-    if args.check:
-        # Nothing bound is the ANSWER here, not a failure: this is how a free key is found.
-        emit(args, reply, f"{reply.get('key')} is free")
-        return 0
-    # A press that reaches nothing looks exactly like one that worked, so say so and fail. This is
-    # the whole reason the reply carries the binding list.
-    emit(args, reply, f"pressed {reply.get('key')} but NOTHING is bound to it")
-    return 1
+    where = f"bound to {', '.join(bound)}" if bound else "bound to nothing"
+    emit(args, reply, f"{verb} {reply.get('key')}, {where}")
+
+    # AN EMPTY LIST IS NOT A FAILURE, and treating it as one was wrong in the one case the verb
+    # exists for. The press goes through KeyboardHandler.keyPress, so it reaches Escape, the F3
+    # chords and whatever the open screen does with the key - none of which are key MAPPINGS, so
+    # none of which appear in boundTo. `key escape` opens the pause menu and reported "NOTHING is
+    # bound to it" with exit 1 while doing it.
+    #
+    # The assertion is still available, because for a mod's own binding it is the useful one: ask
+    # for it with --expect-bound, the way `mine --expect-broken` and `use --expect-screen` work.
+    if args.expect_bound and not bound:
+        return 1
+    return 0
 
 
 def cmd_mine(args) -> int:
@@ -1003,6 +1006,10 @@ def main(argv: list[str] | None = None) -> int:
 
     key = subs.add_parser("key", help="press a key, so a keybind can be tested (devbridge only)")
     key.add_argument("name", help="vanilla's name (key.keyboard.v) or just the key (v)")
+    key.add_argument("--expect-bound", action="store_true",
+                     help="exit non-zero when no key MAPPING is bound to the key. Off by default: a "
+                          "press reaches Escape, the F3 chords and the open screen's own handling, "
+                          "none of which are mappings, so an empty list is an ordinary answer")
     key.add_argument("--check", action="store_true",
                      help="report what the key is bound to and press nothing, which is how you "
                           "find a free key without firing whatever owns it")

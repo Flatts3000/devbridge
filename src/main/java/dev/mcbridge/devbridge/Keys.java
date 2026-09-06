@@ -97,13 +97,21 @@ final class Keys {
         });
 
         if (!checkOnly) {
-            if (hold > 0) {
-                Thread.sleep(Math.max(50L, hold * 50L));
+            // RELEASED IN A FINALLY, the same shape Mining uses for stopDestroyBlock and for the
+            // same reason. A key left logically down stays down for the rest of the run: every
+            // mapping on it reads isDown() true forever, and there is no verb to undo it. An
+            // interrupted sleep or a render thread busy past the fifteen second future timeout is
+            // enough to get there.
+            try {
+                if (hold > 0) {
+                    Thread.sleep(Math.max(50L, hold * 50L));
+                }
+            } finally {
+                onClient(client -> {
+                    press(client, key, GLFW_RELEASE);
+                    return Handlers.ok();
+                });
             }
-            onClient(client -> {
-                press(client, key, GLFW_RELEASE);
-                return Handlers.ok();
-            });
         }
 
         reply.addProperty("ok", true);

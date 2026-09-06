@@ -61,15 +61,19 @@ final class Mining {
         if (!target.get("ok").getAsBoolean()) {
             return target;
         }
-        BlockPos pos = new BlockPos(
+        final BlockPos pos = new BlockPos(
             target.get("x").getAsInt(), target.get("y").getAsInt(), target.get("z").getAsInt());
         String before = target.get("block").getAsString();
+        // Reassigned when the crosshair moves onto a different block mid-hold.
 
         net.minecraft.core.Direction face = net.minecraft.core.Direction.valueOf(
             target.get("face").getAsString());
 
         long started = System.currentTimeMillis();
+        long heldMs = 0;
         boolean broke = false;
+        BlockPos broken = pos;
+        digging = pos;
         try {
             onClient(client -> {
                 client.gameMode.startDestroyBlock(pos, face);
@@ -81,7 +85,17 @@ final class Mining {
             long deadline = started + budget;
             while (System.currentTimeMillis() < deadline) {
                 Thread.sleep(POLL_MS);
-                String now = blockAt(pos);
+                // WATCHES WHAT IS BEING DUG NOW, not what was asked for. With the crosshair moved,
+                // those differ, and the first is the one the answer is about.
+                BlockPos watching = digging;
+                if (watching == null) {
+                    watching = pos;
+                }
+                if (!watching.equals(broken)) {
+                    broken = watching;
+                    before = blockAt(watching);
+                }
+                String now = blockAt(watching);
                 // NOT "is it air". A block can break into another block - gravel falling, a bed
                 // half going, a plant dropping to air and back - and a caller asking "did I break
                 // it" means "is the thing I was hitting gone".
@@ -90,7 +104,12 @@ final class Mining {
                     break;
                 }
             }
+            // Snapshotted here, before the stop round-trip and the blockNow read below. Those cost
+            // two more hops through the render thread, and this number is sold as how long a tool
+            // took - on a fast break they are most of it.
+            heldMs = System.currentTimeMillis() - started;
         } finally {
+            digging = null;
             // ALWAYS. A dig left running keeps breaking blocks for as long as the client does, and
             // there is no verb to stop it: the caller would have to close the game. An exception on
             // the poll thread must not be able to leave one going.
@@ -102,14 +121,16 @@ final class Mining {
         }
 
         JsonObject reply = Handlers.ok();
-        reply.addProperty("x", pos.getX());
-        reply.addProperty("y", pos.getY());
-        reply.addProperty("z", pos.getZ());
+        // The block actually dug, which is the one asked for unless the crosshair moved.
+        reply.addProperty("x", broken.getX());
+        reply.addProperty("y", broken.getY());
+        reply.addProperty("z", broken.getZ());
         reply.addProperty("block", before);
-        reply.addProperty("blockNow", blockAt(pos));
+        reply.addProperty("blockNow", blockAt(broken));
+        reply.addProperty("aimedAt", pos.toShortString());
         reply.addProperty("held", target.get("held").getAsString());
         reply.addProperty("broke", broke);
-        reply.addProperty("heldMs", System.currentTimeMillis() - started);
+        reply.addProperty("heldMs", heldMs);
         return reply;
     }
 
@@ -145,6 +166,16 @@ final class Mining {
     /** One dig in progress. Null when nothing is being mined. */
     private record Dig(BlockPos pos, net.minecraft.core.Direction face) {
     }
+
+    /**
+     * The block the tick handler last actually dug, which is not always the one asked for.
+     *
+     * <p>The hold follows the crosshair, so the block that breaks can be one the caller never named.
+     * Reporting the position resolved at the start would then describe a block that is still
+     * standing and say {@code broke: false} about a call that destroyed something - the exact shape
+     * of wrong answer this tool exists to avoid.
+     */
+    private static volatile BlockPos digging;
 
     private static volatile Dig DIGGING;
     private static boolean listening;
@@ -189,8 +220,10 @@ final class Mining {
         // sweeping past a gap should not silently end the dig.
         if (client.hitResult instanceof BlockHitResult hit
                 && client.hitResult.getType() == HitResult.Type.BLOCK) {
+            digging = hit.getBlockPos().immutable();
             client.gameMode.continueDestroyBlock(hit.getBlockPos(), hit.getDirection());
         } else {
+            digging = dig.pos();
             client.gameMode.continueDestroyBlock(dig.pos(), dig.face());
         }
     }
