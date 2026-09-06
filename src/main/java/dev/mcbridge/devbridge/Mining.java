@@ -174,7 +174,23 @@ final class Mining {
             return;
         }
         Minecraft client = Minecraft.getInstance();
-        if (client.gameMode != null && client.level != null && client.player != null) {
+        if (client.gameMode == null || client.level == null || client.player == null) {
+            return;
+        }
+        // FOLLOWS THE CROSSHAIR, because that is what a held mouse button does. The first version
+        // pinned the block picked when the verb was called and kept sending that position, and it
+        // was wrong in a way that only shows up in the one test worth running: point at a block,
+        // hold, and turn. Vanilla's continueAttack re-reads minecraft.hitResult every tick and digs
+        // whatever is under the crosshair NOW, so switching target mid-hold is ordinary play - and
+        // a pinned target made it unreproducible, which is how a real bug in a mod under test
+        // stayed hidden behind a tool that could not express the thing that triggered it.
+        //
+        // Falls back to the original block when the crosshair is on nothing, rather than stopping:
+        // sweeping past a gap should not silently end the dig.
+        if (client.hitResult instanceof BlockHitResult hit
+                && client.hitResult.getType() == HitResult.Type.BLOCK) {
+            client.gameMode.continueDestroyBlock(hit.getBlockPos(), hit.getDirection());
+        } else {
             client.gameMode.continueDestroyBlock(dig.pos(), dig.face());
         }
     }
