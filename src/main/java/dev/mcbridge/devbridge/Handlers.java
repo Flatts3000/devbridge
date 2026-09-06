@@ -65,7 +65,8 @@ final class Handlers {
             case "pause" -> ClientHandlers.pause(server,
                 !request.has("enabled") || request.get("enabled").getAsBoolean());
             case "screen" -> ClientHandlers.screen(server,
-                request.has("open") ? request.get("open").getAsBoolean() : null);
+                request.has("open") ? request.get("open").getAsBoolean() : null,
+                request.has("filter") ? request.get("filter").getAsString() : null);
             case "cursor" -> ClientHandlers.cursor(server,
                 request.get("x").getAsDouble(), request.get("y").getAsDouble());
             case "click" -> ClientHandlers.click(server,

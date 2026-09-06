@@ -16,6 +16,9 @@ java {
 
 neoForge {
     version = neoforge_version
+    // Widens exactly one method, KeyboardHandler.keyPress, so the `key` verb can drive a real
+    // keypress rather than only a key mapping. See the file for why it is an AT and not a mixin.
+    accessTransformers.from('src/main/resources/META-INF/accesstransformer.cfg')
     // No run configs of its own. This mod exists to be dropped into ANOTHER mod's dev run, so a
     // client/server pair here would only ever launch a world with nothing in it.
 }

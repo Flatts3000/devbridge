@@ -307,7 +307,8 @@ def cmd_screen(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: screens are a client thing and RCON talks to a server")
     with connect(args) as bridge:
-        reply = bridge.screen({"open": True, "close": False}.get(args.state))
+        reply = bridge.screen({"open": True, "close": False}.get(args.state),
+                              filter=args.filter)
     if getattr(args, "json", False):
         emit(args, reply)
     else:
@@ -950,6 +951,11 @@ def main(argv: list[str] | None = None) -> int:
     scr = subs.add_parser("screen", help="what GUI is open (devbridge only)")
     scr.add_argument("state", nargs="?", choices=["open", "close"], default=None,
                      help="open the inventory, or close whatever is open; omit to just report")
+    scr.add_argument("--filter", default=None,
+                     help="report only widgets whose text, type or class contains this. The reply "
+                          "caps at 200 widgets but the WALK does not, so a filter reaches things a "
+                          "full dump truncates away - on a long screen, 'not in the first 200' "
+                          "otherwise reads as 'not there'")
     scr.set_defaults(func=cmd_screen)
 
     lk = subs.add_parser("look", help="where the camera is and what the crosshair is on "

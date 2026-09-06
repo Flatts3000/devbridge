@@ -126,7 +126,7 @@ class DevBridge:
         """
         return self.request(verb="pause", enabled=enabled)
 
-    def screen(self, open: bool | None = None) -> dict:
+    def screen(self, open: bool | None = None, filter: str | None = None) -> dict:
         """What GUI is open, or open the inventory / close what is open.
 
         The reply carries the screen's width and height in GUI-scaled coordinates, which is the
@@ -140,7 +140,9 @@ class DevBridge:
         into that spot. Bounds are null for a child that does not report a rectangle, and
         `widgetsComplete` is false when the list was cut short by the depth or size cap.
         """
-        return self.request(verb="screen", **({} if open is None else {"open": open}))
+        return self.request(verb="screen",
+                            **({} if open is None else {"open": open}),
+                            **({} if filter is None else {"filter": filter}))
 
     def look(self) -> dict:
         """Where the camera is, and what the crosshair is on.

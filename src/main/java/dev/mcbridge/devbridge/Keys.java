@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * Press a key, from outside the game. Loaded only on a client - see {@link ClientHandlers}.
@@ -34,13 +35,20 @@ import net.minecraft.client.Minecraft;
  * the two verbs look inconsistent and are not - each drives the game at the lowest level that is
  * actually reached when a player does the thing.
  *
- * <p><b>It presses key MAPPINGS, not keys, and the difference has teeth.</b> Escape, the F3 chords
- * and anything else vanilla handles inside {@code KeyboardHandler.keyPress} are not key mappings, so
- * this reaches none of them: {@code key escape} reports whatever mapping happens to share the key -
- * JEI binds one - and the pause menu does not open. Driving those needs
- * {@code KeyboardHandler.keyPress}, which is private and takes a {@code KeyEvent}, so it needs an
- * access transformer. Worth doing when something actually needs it; recorded here so the next person
- * does not spend the time finding out the same way.
+ * <p><b>It presses a KEY, not a key mapping, and the first version did the lesser thing.</b> That one
+ * called {@code KeyMapping.set} and {@code KeyMapping.click} directly, which covers every binding a
+ * mod registers and nothing else. Escape, the F3 chords and a screen's own key handling are not key
+ * mappings: {@code key escape} reported whatever binding happened to share the key and the pause
+ * menu stayed shut, so no screen could be opened and nothing living in one could be checked - which
+ * is most of a mod's settings.
+ *
+ * <p>So this calls {@code KeyboardHandler.keyPress}, widened by an access transformer, with a
+ * {@code KeyEvent} built exactly as GLFW's own callback builds it. Everything follows from there,
+ * including the dispatch to {@code KeyMapping.set}/{@code click} that the first version did by hand.
+ *
+ * <p><b>One behaviour follows from being faithful and is worth expecting:</b> vanilla does not fire
+ * keybinds while a screen is open, so neither does this. A binding that does nothing during a
+ * screen is correct, not a bug in the verb.
  *
  * <p><b>It reports what is bound to the key, and that is the useful half of the answer.</b> A press
  * that reaches nothing is the failure worth catching, and it is indistinguishable from a press that
@@ -83,8 +91,7 @@ final class Keys {
             }
             bound.add("boundTo", mappings);
             if (!checkOnly) {
-                KeyMapping.set(key, true);
-                KeyMapping.click(key);
+                press(client, key, GLFW_PRESS);
             }
             return bound;
         });
@@ -94,7 +101,7 @@ final class Keys {
                 Thread.sleep(Math.max(50L, hold * 50L));
             }
             onClient(client -> {
-                KeyMapping.set(key, false);
+                press(client, key, GLFW_RELEASE);
                 return Handlers.ok();
             });
         }
@@ -104,6 +111,22 @@ final class Keys {
         reply.addProperty("heldTicks", checkOnly ? 0 : hold);
         reply.addProperty("pressed", !checkOnly);
         return reply;
+    }
+
+    /** GLFW's own action codes, which is what keyPress switches on: zero is a release. */
+    private static final int GLFW_RELEASE = 0;
+    private static final int GLFW_PRESS = 1;
+
+    /**
+     * One keypress, through the same door a keyboard uses.
+     *
+     * <p>The scancode is zero and the modifiers are none. Neither is read for anything this verb is
+     * for: the scancode only reaches crash reports and key-name lookup, and modifiers matter to
+     * chords, which want their modifier pressed as its own key first anyway.
+     */
+    private static void press(Minecraft client, InputConstants.Key key, int action) {
+        client.keyboardHandler.keyPress(client.getWindow().handle(), action,
+            new KeyEvent(key.getValue(), 0, 0));
     }
 
     /** Every key mapping currently bound to this key, by its translation key. */

@@ -66,11 +66,12 @@ final class ClientHandlers {
         return InputLock.set(enabled);
     }
 
-    static JsonObject screen(MinecraftServer server, Boolean open) throws Exception {
+    static JsonObject screen(MinecraftServer server, Boolean open, String filter)
+            throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: there are no screens on a server");
         }
-        return open == null ? ScreenDriver.describe() : ScreenDriver.set(open);
+        return open == null ? ScreenDriver.describe(filter) : ScreenDriver.set(open);
     }
 
     static JsonObject cursor(MinecraftServer server, double x, double y) throws Exception {

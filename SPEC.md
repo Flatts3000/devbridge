@@ -82,12 +82,12 @@ silently accepted typo is the worst outcome for a tool whose whole job is tellin
 | `hud` | client render thread | Shows or hides the HUD. Separate from `screenshot` because the capture takes the framebuffer as it already is |
 | `input` | client render thread | Hands the mouse back, or takes it again. Not locked unless asked; see the decisions table |
 | `pause` | client render thread | Restores pausing on lost focus, or turns it off again. Off automatically on world load |
-| `screen` | client render thread | Reports the open GUI, its title, its GUI-scaled size, and the widgets in it - each with its label, bounds and a click point in that same space. Opens the inventory or closes anything |
+| `screen` | client render thread | Reports the open GUI, its title, its GUI-scaled size, and the widgets in it - `--filter` reports only matching ones, and reaches past the 200-widget reply cap because the cap counts what is REPORTED rather than what is walked - each with its label, bounds and a click point in that same space. Opens the inventory or closes anything |
 | `cursor` | client render thread | Moves the pointer, which is what renders a tooltip. Moves the real OS cursor, not just the screen's idea of it |
 | `use` | client render thread | Right-click: use the held item, which is how a GUI gets OPENED. `auto` prefers whatever the crosshair is on, the way vanilla does; `item` forces the item in the air. Names what was in hand, so an empty slot is distinguishable from an item that opened nothing |
 | `click` | client render thread | Press and release at a point. Reports what it saw, none of which is a verdict: screens over- and under-report, and consequences land asynchronously. Verify with `screen` or a picture |
 | `mine` | client render thread | Left-click and HELD: breaks what the crosshair is on, then reports whether it went and how long it took. Holding is the point - a single press does nothing to a block, and `click` cannot express duration. Drives `MultiPlayerGameMode` per tick rather than pressing the attack key, because vanilla only continues an attack while the mouse is grabbed and this bridge never grabs it |
-| `key` | client render thread | Presses a key, doing what `KeyboardHandler` does: `KeyMapping.set` then `KeyMapping.click`, which is the half `consumeClick` drains. Reports what the key is BOUND to, and that is the useful half - a press reaching nothing is indistinguishable from one that worked. `--check` reports the owners and presses nothing, which is how a free default binding is chosen. Presses MAPPINGS, not keys: Escape and the F3 chords are handled inside `KeyboardHandler` and are not mappings, so this does not reach them |
+| `key` | client render thread | Presses a key, doing what `KeyboardHandler` does: `KeyMapping.set` then `KeyMapping.click`, which is the half `consumeClick` drains. Reports what the key is BOUND to, and that is the useful half - a press reaching nothing is indistinguishable from one that worked. `--check` reports the owners and presses nothing, which is how a free default binding is chosen. Presses a KEY, through `KeyboardHandler.keyPress` (widened by this mod's one access transformer), so Escape, the F3 chords and a screen's own key handling all work - not just key mappings. Vanilla does not fire keybinds while a screen is open, and neither does this |
 | `look` | client render thread | Where the camera is - which is not the player in third person or spectator - and what the crosshair is on, as a block with its full state or an entity. Reports nothing a command already answers: position, rotation, velocity and on-ground all come back from `data get entity` |
 | `stop` | either | Halts the world, and on a client quits the game. Quitting matters: a client left at the title screen keeps the world's file locks, and the next launch fails looking like a corrupt save |
 
@@ -237,6 +237,13 @@ agreeing with the wrong answer:
   building from the server's stack and borrowing only the player's entity, dimension, position and
   rotation. It is invisible in a world with cheats on, where the player is already level 4, which is
   why it survived a full session of use.
+- **"Not in the first two hundred widgets" read as "not there".** Checking that a mod's key binding
+  landed in its own category meant opening the Key Binds screen, and that list is long enough that
+  the last categories fall past the widget cap. The dump showed eight vanilla categories and one
+  other mod's, and the honest conclusion from it was that the category was missing - it was not, it
+  was at entry two hundred and something. `--filter` fixes it properly rather than by raising the
+  number: the cap counts what is reported, never what is walked, so a filtered walk sees the whole
+  screen. A cap that silently changes the answer is worse than a small one that does not.
 - **A keybind was the last input a mod could ship and not test, and the first press found a bug.**
   `cmd` reaches the server, `click` drives a GUI widget, `use` and `mine` reach the world; a feature
   bound to a key had no call to make. The mod this was built for had bound itself to V on the belief
