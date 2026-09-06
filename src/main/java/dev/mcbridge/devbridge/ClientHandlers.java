@@ -66,11 +66,12 @@ final class ClientHandlers {
         return InputLock.set(enabled);
     }
 
-    static JsonObject screen(MinecraftServer server, Boolean open) throws Exception {
+    static JsonObject screen(MinecraftServer server, Boolean open, String filter)
+            throws Exception {
         if (!available(server)) {
             return Handlers.error("no client on this side: there are no screens on a server");
         }
-        return open == null ? ScreenDriver.describe() : ScreenDriver.set(open);
+        return open == null ? ScreenDriver.describe(filter) : ScreenDriver.set(open);
     }
 
     static JsonObject cursor(MinecraftServer server, double x, double y) throws Exception {
@@ -96,6 +97,25 @@ final class ClientHandlers {
                 + "is a command.");
         }
         return HandUse.use(offhand, target, waitMs);
+    }
+
+    static JsonObject mine(MinecraftServer server, Integer timeoutMs) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a dedicated server has no mouse to hold "
+                + "and no crosshair to hold it at. Breaking a block from a server is `cmd` with "
+                + "setblock, which is a different thing and does not exercise a tool.");
+        }
+        return Mining.mine(timeoutMs);
+    }
+
+    static JsonObject key(MinecraftServer server, String name, Integer holdTicks,
+                          boolean checkOnly) throws Exception {
+        if (!available(server)) {
+            return Handlers.error("no client on this side: a dedicated server has no keyboard. A "
+                + "keybind is a client thing by definition - what it triggers may reach the server, "
+                + "but the press cannot start there.");
+        }
+        return Keys.press(name, holdTicks, checkOnly);
     }
 
     static JsonObject look(MinecraftServer server) throws Exception {

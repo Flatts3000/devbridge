@@ -126,7 +126,7 @@ class DevBridge:
         """
         return self.request(verb="pause", enabled=enabled)
 
-    def screen(self, open: bool | None = None) -> dict:
+    def screen(self, open: bool | None = None, filter: str | None = None) -> dict:
         """What GUI is open, or open the inventory / close what is open.
 
         The reply carries the screen's width and height in GUI-scaled coordinates, which is the
@@ -140,7 +140,9 @@ class DevBridge:
         into that spot. Bounds are null for a child that does not report a rectangle, and
         `widgetsComplete` is false when the list was cut short by the depth or size cap.
         """
-        return self.request(verb="screen", **({} if open is None else {"open": open}))
+        return self.request(verb="screen",
+                            **({} if open is None else {"open": open}),
+                            **({} if filter is None else {"filter": filter}))
 
     def look(self) -> dict:
         """Where the camera is, and what the crosshair is on.
@@ -168,6 +170,51 @@ class DevBridge:
         is an observable consequence and a better signal; a screenshot is better still.
         """
         return self.request(verb="click", x=x, y=y, button=button)
+
+    def key(self, name: str, hold_ticks: int | None = None, check: bool = False) -> dict:
+        """Press a key, the way vanilla's own keyboard handler does.
+
+        The last input a mod could ship and not test. `cmd` reaches the server, `click` drives a GUI
+        widget, `use` and `mine` reach the world; a feature bound to a key had no call to make. The
+        seams this covers all compile and all pass every headless test: a mapping registered in the
+        wrong category, bound to a key something else already owns, or polled from the wrong bus.
+
+        `name` takes vanilla's spelling (`key.keyboard.v`) or just `v`.
+
+        Returns `boundTo`, every mapping the key currently owns. **An empty list is the finding** -
+        it means the press reached nothing, which is otherwise indistinguishable from one that
+        worked.
+        """
+        # holdTicks is OMITTED rather than sent as null, this client's convention throughout: a
+        # null makes has() true on the other side while the value is JsonNull, and getAsInt throws.
+        return self.request(verb="key", name=name, check=check,
+                            **({} if hold_ticks is None else {"holdTicks": hold_ticks}))
+
+    def mine(self, timeout_ms: int | None = None) -> dict:
+        """Hold left mouse on whatever the crosshair is on, until it breaks or the time runs out.
+
+        This is the verb `click` is not. `click` and `cursor` drive a GUI that is already open and
+        refuse when none is, so before this existed nothing about breaking a block was reachable
+        from outside: tool speed, durability, drops, dig progress, or simply "did it go".
+
+        Drives MultiPlayerGameMode's destroy loop once per client tick, following the crosshair the
+        way a held mouse button does. It does NOT hold the attack binding: Minecraft.tick gates a
+        held attack on the mouse being grabbed, and this bridge never grabs it, so that path mines
+        nothing. The miss timer and the swing animation are skipped with it - neither affects
+        whether a block breaks, but do not read a timing from here as proof the vanilla input path
+        ran. The dig is always stopped, including when this raises.
+
+        Returns the block that was there, the block there now, what was held, whether it broke, and
+        how long the button was down. `broke` compares the block against what was there rather than
+        against air, because a block can break into another block.
+
+        In creative everything breaks instantly whatever is held, so a caller measuring a tool wants
+        survival first.
+        """
+        # The key is OMITTED rather than sent as null, this client's convention throughout: a null
+        # makes has() true on the other side while the value is JsonNull, and getAsInt throws on it.
+        return self.request(verb="mine",
+                            **({} if timeout_ms is None else {"timeoutMs": timeout_ms}))
 
     def use(self, offhand: bool = False, target: str = "auto",
             wait_ms: int | None = None) -> dict:

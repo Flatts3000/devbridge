@@ -78,7 +78,7 @@ final class ScreenDriver {
      * centre from here can be handed straight back without conversion. That was worth stating: the
      * space was previously only inferable from the reported width and height.
      */
-    static JsonObject describe() throws Exception {
+    static JsonObject describe(String filter) throws Exception {
         return onClient(client -> {
             JsonObject reply = Handlers.ok();
             Screen screen = client.screen;
@@ -92,11 +92,24 @@ final class ScreenDriver {
             reply.addProperty("height", screen.height);
 
             JsonArray widgets = new JsonArray();
-            boolean complete = collect(screen, widgets, 0);
+            boolean complete = collect(screen, widgets, 0, filter);
             reply.add("widgets", widgets);
             reply.addProperty("widgetsComplete", complete);
             return reply;
         });
+    }
+
+    /** Case-insensitive substring match against the text and class of one widget. */
+    private static boolean matches(JsonObject widget, String filter) {
+        String needle = filter.toLowerCase(java.util.Locale.ROOT);
+        for (String field : new String[] {"text", "class", "type"}) {
+            if (widget.has(field) && !widget.get(field).isJsonNull()
+                && widget.get(field).getAsString().toLowerCase(java.util.Locale.ROOT)
+                    .contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -107,7 +120,8 @@ final class ScreenDriver {
      * {@code widgetsComplete: false} - a truncated list that claims to be whole is how a caller
      * concludes a button does not exist.
      */
-    private static boolean collect(GuiEventListener parent, JsonArray out, int depth) {
+    private static boolean collect(GuiEventListener parent, JsonArray out, int depth,
+                                   String filter) {
         List<? extends GuiEventListener> children;
         try {
             if (!(parent instanceof ContainerEventHandler container)) {
@@ -124,9 +138,17 @@ final class ScreenDriver {
             if (out.size() >= MAX_WIDGETS) {
                 return false;
             }
-            out.add(describe(child, depth));
+            JsonObject described = describe(child, depth);
+            // THE CAP COUNTS WHAT IS REPORTED, NOT WHAT IS WALKED, so a filter reaches things a full
+            // dump cannot. Found needing it on the Key Binds screen: the list is long enough that
+            // the last categories fall past two hundred widgets, and "not in the first two hundred"
+            // is indistinguishable from "not there" - which is exactly the wrong answer to give
+            // about a screen somebody is checking their own mod against.
+            if (filter == null || matches(described, filter)) {
+                out.add(described);
+            }
             if (depth + 1 < MAX_DEPTH) {
-                complete &= collect(child, out, depth + 1);
+                complete &= collect(child, out, depth + 1, filter);
             } else if (hasChildren(child)) {
                 complete = false;
             }

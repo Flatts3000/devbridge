@@ -307,7 +307,8 @@ def cmd_screen(args) -> int:
     if args.devbridge is None:
         sys.exit("--devbridge required: screens are a client thing and RCON talks to a server")
     with connect(args) as bridge:
-        reply = bridge.screen({"open": True, "close": False}.get(args.state))
+        reply = bridge.screen({"open": True, "close": False}.get(args.state),
+                              filter=args.filter)
     if getattr(args, "json", False):
         emit(args, reply)
     else:
@@ -456,6 +457,54 @@ def cmd_use(args) -> int:
     # nothing at all, and a verb that failed on those would be useless for anything but books.
     if args.expect_screen and not reply.get("openedScreen"):
         print(f"expected a screen and none opened (held: {held})", file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_key(args) -> int:
+    """Press a key. Reports what the key is bound to; --expect-bound asserts there is something."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: a keyboard is a client thing")
+
+    with connect(args) as bridge:
+        reply = bridge.key(args.name, hold_ticks=args.hold_ticks, check=args.check)
+
+    bound = reply.get("boundTo") or []
+    verb = "pressed" if reply.get("pressed") else "checked"
+    where = f"bound to {', '.join(bound)}" if bound else "bound to nothing"
+    emit(args, reply, f"{verb} {reply.get('key')}, {where}")
+
+    # AN EMPTY LIST IS NOT A FAILURE, and treating it as one was wrong in the one case the verb
+    # exists for. The press goes through KeyboardHandler.keyPress, so it reaches Escape, the F3
+    # chords and whatever the open screen does with the key - none of which are key MAPPINGS, so
+    # none of which appear in boundTo. `key escape` opens the pause menu and reported "NOTHING is
+    # bound to it" with exit 1 while doing it.
+    #
+    # The assertion is still available, because for a mod's own binding it is the useful one: ask
+    # for it with --expect-bound, the way `mine --expect-broken` and `use --expect-screen` work.
+    if args.expect_bound and not bound:
+        return 1
+    return 0
+
+
+def cmd_mine(args) -> int:
+    """Hold left mouse until the block breaks. Non-zero if it did not and one was expected."""
+    if args.devbridge is None:
+        sys.exit("--devbridge required: mining is a client thing")
+
+    with connect(args) as bridge:
+        reply = bridge.mine(timeout_ms=args.timeout_ms)
+
+    outcome = "broke" if reply.get("broke") else "did NOT break"
+    emit(args, reply, f"{outcome} {reply.get('block')} at "
+                      f"{reply.get('x')},{reply.get('y')},{reply.get('z')}"
+                      f" holding {reply.get('held')} after {reply.get('heldMs')}ms")
+    # Non-zero only when a break was asked for and did not happen, matching `use --expect-screen`.
+    # Plenty of legitimate calls are meant to fail to break: that is how you prove a tool is too
+    # weak, or that a protection plugin is holding.
+    if args.expect_broken and not reply.get("broke"):
+        print(f"expected {reply.get('block')} to break and it did not "
+              f"(held: {reply.get('held')})", file=sys.stderr)
         return 1
     return 0
 
@@ -905,6 +954,11 @@ def main(argv: list[str] | None = None) -> int:
     scr = subs.add_parser("screen", help="what GUI is open (devbridge only)")
     scr.add_argument("state", nargs="?", choices=["open", "close"], default=None,
                      help="open the inventory, or close whatever is open; omit to just report")
+    scr.add_argument("--filter", default=None,
+                     help="report only widgets whose text, type or class contains this. The reply "
+                          "caps at 200 widgets but the WALK does not, so a filter reaches things a "
+                          "full dump truncates away - on a long screen, 'not in the first 200' "
+                          "otherwise reads as 'not there'")
     scr.set_defaults(func=cmd_screen)
 
     lk = subs.add_parser("look", help="where the camera is and what the crosshair is on "
@@ -939,6 +993,30 @@ def main(argv: list[str] | None = None) -> int:
                      help="exit non-zero if no screen opened. An empty hotbar slot and an item that "
                           "opens nothing look identical from outside, so say which you expected")
     use.set_defaults(func=cmd_use)
+
+    mine = subs.add_parser("mine", help="left-click and hold: break what the crosshair is on")
+    mine.add_argument("--timeout-ms", type=int, default=None, dest="timeout_ms",
+                      help="how long to hold before giving up (default 5000). The key is always "
+                           "released, including on failure")
+    mine.add_argument("--expect-broken", action="store_true",
+                      help="exit non-zero if the block did not break. Not the default: proving a "
+                           "tool is too weak, or that something is protecting the block, is a "
+                           "legitimate call that must not look like an error")
+    mine.set_defaults(func=cmd_mine)
+
+    key = subs.add_parser("key", help="press a key, so a keybind can be tested (devbridge only)")
+    key.add_argument("name", help="vanilla's name (key.keyboard.v) or just the key (v)")
+    key.add_argument("--expect-bound", action="store_true",
+                     help="exit non-zero when no key MAPPING is bound to the key. Off by default: a "
+                          "press reaches Escape, the F3 chords and the open screen's own handling, "
+                          "none of which are mappings, so an empty list is an ordinary answer")
+    key.add_argument("--check", action="store_true",
+                     help="report what the key is bound to and press nothing, which is how you "
+                          "find a free key without firing whatever owns it")
+    key.add_argument("--hold-ticks", type=int, default=None,
+                     help="hold it down this many ticks before releasing; omit for a tap, which is "
+                          "what a binding read with consumeClick wants")
+    key.set_defaults(func=cmd_key)
 
     ps = subs.add_parser("ps", help="what has been launched, and whether it is still running")
     ps.set_defaults(func=cmd_ps)
