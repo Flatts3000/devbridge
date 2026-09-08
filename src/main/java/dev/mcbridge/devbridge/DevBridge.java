@@ -3,6 +3,7 @@ package dev.mcbridge.devbridge;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.slf4j.Logger;
@@ -63,11 +64,48 @@ public class DevBridge {
             LOGGER.info("devbridge is present but idle: set -D{}=<port> to enable it", PORT_PROPERTY);
             return;
         }
-        // Started on ServerStarted rather than here, because `cmd` needs a MinecraftServer to run
-        // against and construction happens long before one exists. A socket that accepts connections
-        // it cannot serve is worse than one that is not open yet.
         NeoForge.EVENT_BUS.addListener(this::onServerStarted);
         NeoForge.EVENT_BUS.addListener(this::onServerStopping);
+
+        // ON A CLIENT, OPEN NOW RATHER THAN WAITING FOR A WORLD.
+        //
+        // This used to wait for ServerStarted, reasoning that `cmd` needs a MinecraftServer and
+        // that a socket which accepts connections it cannot serve is worse than one not yet open.
+        // The first half is still true and `cmd` still refuses without a world. The second half was
+        // wrong in one specific way: half the verbs - screen, click, cursor, key, screenshot, hud,
+        // input - drive the CLIENT and never needed a server for anything except asking whether a
+        // client existed. Withholding the socket until a world loaded made them unreachable at the
+        // one screen every session begins on.
+        //
+        // That is not hypothetical. A pack whose title screen is replaced by FancyMenu swallows
+        // --quickPlaySingleplayer, so the game sits at the menu, no world ever loads, and the tool
+        // that exists to drive GUIs cannot connect to click the button that would load one.
+        //
+        // A socket that serves what it can and says plainly what it cannot beats a refused
+        // connection, which is indistinguishable from a game that has not finished starting.
+        if (isClient()) {
+            server = new BridgeServer(port, null);
+            server.start();
+        }
+    }
+
+    /**
+     * Whether a GUI can be driven here, asked before any world exists.
+     *
+     * <p>This is the one place an FML dist lookup is right, and the class note about preferring
+     * {@code isDedicatedServer} does not apply: that answer comes from a
+     * {@code MinecraftServer}, and the entire point of this check is that it runs before one is
+     * created.
+     *
+     * <p>It also may not ask the classloader. A first attempt used
+     * {@code Class.forName("net.minecraft.client.Minecraft", false, ...)}, which is safe in
+     * itself - the name is a string and nothing is initialised - but `check_invariants.sh` greps
+     * for client classes named outside the client-only files and failed the build. The check
+     * cannot tell a string from a type reference, and a guard that has to reason about which
+     * mentions are safe is not a guard. The dist is the same answer without the argument.
+     */
+    private static boolean isClient() {
+        return FMLEnvironment.getDist().isClient();
     }
 
     private static int port() {
@@ -123,14 +161,23 @@ public class DevBridge {
             flag(LOCK_INPUT_PROPERTY, false));
 
         if (server != null) {
-            return;   // singleplayer opens and closes worlds repeatedly; keep the first socket
+            // Singleplayer opens and closes worlds repeatedly; keep the first socket and hand it
+            // the new world. On a client the socket was already open before any world existed.
+            server.attach(event.getServer());
+            return;
         }
         server = new BridgeServer(port(), event.getServer());
         server.start();
     }
 
     private void onServerStopping(ServerStoppingEvent event) {
-        if (server != null) {
+        if (server != null && isClient()) {
+            // Leaving a world returns a client to the title screen, and the socket outlives that:
+            // drop the world, keep listening. Closing here would make quitting to the menu look
+            // exactly like the game having exited, and would strand a caller that wanted to load a
+            // different world next.
+            server.attach(null);
+        } else if (server != null) {
             server.shutdown();
             server = null;
         }

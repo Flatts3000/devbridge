@@ -52,7 +52,16 @@ final class Handlers {
      * whole point of having it: a client reading the old meaning is quietly wrong rather than
      * broken, which is the failure this number exists to make loud.
      */
-    static final int PROTOCOL_VERSION = 2;
+    // 3: a client answers before a world exists. Three things changed meaning at once, and the
+    // bump is for the second and third rather than for the added `world` field.
+    //   - `side` gained a third value, "client", where it only ever said dedicated or integrated.
+    //   - `worldName` can be "" instead of always naming a loaded world.
+    //   - A successful ping no longer implies a world exists at all.
+    // The rule above says to bump when a field changes meaning, and this is precisely the case it
+    // is for: a 0.5.0 client passes the handshake against this mod and is then QUIETLY WRONG -
+    // its `launch --wait --world X` returns success at the title screen. Refusing the handshake
+    // is the louder and better failure.
+    static final int PROTOCOL_VERSION = 3;
 
     private Handlers() {
     }
@@ -61,8 +70,12 @@ final class Handlers {
         String verb = request.has("verb") ? request.get("verb").getAsString() : "";
         return switch (verb) {
             case "ping" -> ping(server);
-            case "cmd" -> command(server, request.get("command").getAsString(),
-                request.has("player") ? request.get("player").getAsString() : null);
+            case "cmd" -> server == null
+                ? error("no world is loaded, and a command needs one. The client verbs "
+                    + "(screen, click, key, cursor, screenshot) work without a world; use them "
+                    + "to get into a world first.")
+                : command(server, request.get("command").getAsString(),
+                    request.has("player") ? request.get("player").getAsString() : null);
             case "screenshot" -> screenshot(request, server);
             case "hud" -> ClientHandlers.hud(server,
                 !request.has("show") || request.get("show").getAsBoolean());
@@ -117,15 +130,23 @@ final class Handlers {
     private static JsonObject ping(MinecraftServer server) {
         JsonObject reply = ok();
         reply.addProperty("protocol", PROTOCOL_VERSION);
-        reply.addProperty("side", server.isDedicatedServer() ? "dedicated" : "integrated");
+        reply.addProperty("side", server == null
+            ? "client" : server.isDedicatedServer() ? "dedicated" : "integrated");
         reply.addProperty("mcVersion", SharedConstants.getCurrentVersion().name());
         reply.addProperty("hasClient", ClientHandlers.available(server));
+
+        // NEW FIELD, and the one a caller waiting for a world should read. On a client the socket
+        // now opens at startup, so answering `ping` no longer means a world exists - it means the
+        // game is up. Adding a field is backwards compatible, so the protocol version does not
+        // move; a client that has never heard of `world` behaves exactly as it did.
+        reply.addProperty("world", server != null);
 
         // WHICH GAME THIS IS, not just what kind. Two Minecraft 26.1.2 clients on one machine are
         // indistinguishable from the fields above, and that is not hypothetical: a pack's verifier
         // once connected to another project's dev client and reported a clean pass about the wrong
         // world. A caller that can name what it expected can now check it got that.
-        reply.addProperty("worldName", server.getWorldData().getLevelName());
+        reply.addProperty("worldName",
+            server == null ? "" : server.getWorldData().getLevelName());
         reply.addProperty("mods", ModList.get().size());
 
         // Whether this client will answer while you are looking at something else, whether the
@@ -186,7 +207,12 @@ final class Handlers {
         // client's run loop only ends after that work drains. Verified by stopping a world with a
         // block placed in it and finding the block still there on the next launch; the ordering is
         // load-bearing rather than incidental.
-        if (hasClient) {
+        if (hasClient && server == null) {
+            // No world to save and no server thread to queue onto. quit() already hands itself to
+            // the client thread, so calling it from here is safe; the ordering note below is about
+            // shutting a world down cleanly, and with no world there is nothing to order.
+            ClientHandlers.quit();
+        } else if (hasClient) {
             server.execute(() -> {
                 server.halt(false);
                 ClientHandlers.quit();
