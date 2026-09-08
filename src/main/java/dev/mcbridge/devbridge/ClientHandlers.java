@@ -21,7 +21,11 @@ final class ClientHandlers {
     }
 
     static boolean available(MinecraftServer server) {
-        return !server.isDedicatedServer();
+        // A null server means no world is loaded, and the socket only opens without one on a
+        // client - DevBridge checks for client classes before opening early. So no world is not
+        // no client; it is a client sitting at a menu, which is exactly when driving a GUI is
+        // most useful and used to be impossible.
+        return server == null || !server.isDedicatedServer();
     }
 
     static JsonObject screenshot(MinecraftServer server, String name) throws Exception {

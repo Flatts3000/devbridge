@@ -33,7 +33,7 @@ import net.minecraft.server.MinecraftServer;
 final class BridgeServer extends Thread {
 
     private final int port;
-    private final MinecraftServer minecraftServer;
+    private volatile MinecraftServer minecraftServer;
     private volatile boolean running = true;
     private ServerSocket socket;
 
@@ -42,6 +42,18 @@ final class BridgeServer extends Thread {
         this.port = port;
         this.minecraftServer = minecraftServer;
         setDaemon(true);
+    }
+
+    /**
+     * Hand the socket a world, or take one away.
+     *
+     * <p>The server used to be fixed at construction because the socket only ever opened once a
+     * world existed. On a client it now opens at startup, so the same socket outlives any number of
+     * worlds being loaded and closed: {@code attach(server)} on start, {@code attach(null)} on stop.
+     * Volatile because the socket thread reads it while the server thread writes it.
+     */
+    void attach(MinecraftServer server) {
+        this.minecraftServer = server;
     }
 
     @Override

@@ -724,6 +724,7 @@ def cmd_launch(args) -> int:
     # Poll the socket rather than the process: a live pid means java started, not that the mod is
     # listening, and the gap between them is most of a minute.
     deadline = time.monotonic() + args.for_seconds
+    last = "no answer yet"
     while time.monotonic() < deadline:
         if process.poll() is not None:
             emit(args, {**started_info, "up": False, "exitCode": process.returncode})
@@ -743,13 +744,33 @@ def cmd_launch(args) -> int:
         try:
             with DevBridge(port=args.port, timeout=5.0) as bridge:
                 reply = bridge.ping()
+            # A CLIENT NOW ANSWERS BEFORE ANY WORLD EXISTS (devbridge 0.6.0), so an answer alone no
+            # longer means what --wait was asked for. A caller that named a world wants that world
+            # loaded; returning at the title screen would hand every existing script - the quest
+            # verifier included - a bridge with no world behind it, and the failure would surface
+            # later as "cmd needs a world" from somewhere that never asked about worlds.
+            #
+            # `world` is absent on devbridge 0.5.0 and earlier, where answering did mean a world.
+            # Treating missing as True keeps those builds behaving exactly as before.
+            if args.world and not reply.get("world", True):
+                last = "at the title screen, no world yet"
+                time.sleep(3.0)
+                continue
             emit(args, {**started_info, "up": True, **reply},
                  f"up: {reply.get('side')}, protocol {reply.get('protocol')}")
             return 0
         except (OSError, DevBridgeError):
             time.sleep(3.0)
     emit(args, {**started_info, "up": False, "timedOut": True})
-    print(f"launch: no answer on {args.port} within {args.for_seconds:g}s", file=sys.stderr)
+    print(f"launch: not ready on {args.port} within {args.for_seconds:g}s ({last})",
+          file=sys.stderr)
+    if args.world and last.startswith("at the title screen"):
+        # The distinction that matters: the game is up and reachable, it just never loaded the
+        # world. A replaced title screen swallows --quickPlaySingleplayer, and FancyMenu is the
+        # common cause. The bridge is open, so the menu can be driven from here.
+        print("launch: the game IS answering, so drive the menu: "
+              f"gamebridge --devbridge {args.port} screen, then click your way in.",
+              file=sys.stderr)
     return 1
 
 
