@@ -104,7 +104,12 @@ from the app's own install and runs it with the property set:
 gamebridge launch --instance "C:/.../Instances/YourPack" --port <your port> --world "New World" --wait
 ```
 
-`--wait` blocks until the mod answers and checks the protocol version.
+`--wait` blocks until the mod answers, checks the protocol version, **and waits for a world to be
+loaded**. On a client the socket now opens at startup, so answering alone means the game is up, not
+that it is usable: every verb worth waiting for needs a world. If it times out having reached the
+game but never loaded a world, it says so and points at `screen` - a title screen waiting on input
+looks identical to a slow start otherwise, and Minecraft's first-run accessibility prompt swallows
+`--quickPlaySingleplayer` exactly this way.
 [`docs/onboarding.md`](docs/onboarding.md) covers both routes properly.
 
 **Loading a world turns off pause-on-lost-focus for you, the same as pressing F3+P.** Every use of
@@ -132,7 +137,7 @@ One request per line, one reply per line.
 
 | Verb | Runs on | Request fields | Reply |
 |---|---|---|---|
-| `ping` | either | none | `{"ok":true,"protocol":2,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
+| `ping` | either | none | `{"ok":true,"protocol":3,"side":"integrated","mcVersion":"26.1.2","hasClient":true,"world":true,"worldName":"New World","mods":51,"gameDir":"...","pauseOnLostFocus":false,"inputLocked":false}` |
 | `cmd` | server thread | `command`, optional `player` | `{"ok":true,"output":"...","executed":true,"success":true,"result":201960}` - what it printed, whether it ran, whether it worked, and its integer result |
 | `screenshot` | client render thread | optional `name`, optional `width`+`height` | `{"ok":true,"message":"...","dir":"...","path":"..."}` once the file is on disk. Plus `guiRelayout`, `screenBefore` and `screenAtCapture` when a GUI was open for a sized shot |
 | `hud` | client render thread | optional `show` (default `true`) | `{"ok":true,"hudVisible":false}` |
@@ -193,6 +198,10 @@ does not recognise. It only changes when a verb or field is renamed, removed, or
 move it, because a client that has never heard of a new verb carries on working. It went to 2 in
 0.3.0 because `click`'s `handled` changed meaning without changing name or type, which is exactly
 the case a version number exists to catch. A reply with no `protocol` field at all is a mod from before the field existed.
+
+`world` says whether a world is loaded. On a client the socket opens at startup, so a reply is not a
+promise that `cmd`, `check` or `probe` will work; those refuse without a world and say so. `side` is
+`client` while no world exists, and `worldName` is `""` rather than absent.
 
 `worldName`, `mods` and `gameDir` are there to answer "which game is this", which nothing else in
 the reply does: two clients of the same Minecraft version are otherwise identical. `gamebridge ping

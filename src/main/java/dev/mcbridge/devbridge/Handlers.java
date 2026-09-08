@@ -52,7 +52,16 @@ final class Handlers {
      * whole point of having it: a client reading the old meaning is quietly wrong rather than
      * broken, which is the failure this number exists to make loud.
      */
-    static final int PROTOCOL_VERSION = 2;
+    // 3: a client answers before a world exists. Three things changed meaning at once, and the
+    // bump is for the second and third rather than for the added `world` field.
+    //   - `side` gained a third value, "client", where it only ever said dedicated or integrated.
+    //   - `worldName` can be "" instead of always naming a loaded world.
+    //   - A successful ping no longer implies a world exists at all.
+    // The rule above says to bump when a field changes meaning, and this is precisely the case it
+    // is for: a 0.5.0 client passes the handshake against this mod and is then QUIETLY WRONG -
+    // its `launch --wait --world X` returns success at the title screen. Refusing the handshake
+    // is the louder and better failure.
+    static final int PROTOCOL_VERSION = 3;
 
     private Handlers() {
     }

@@ -145,7 +145,13 @@ def cmd_wait(args) -> int:
                 rcon.command("list")
             emit(args, {"up": True}, "server is up")
             return 0
-        except (OSError, RconError, SystemExit) as exc:
+        except (OSError, RconError, DevBridgeError, SystemExit) as exc:
+            # DevBridgeError is a SIBLING of RconError - both extend RuntimeError - so catching
+            # RconError alone missed it. That was harmless while the socket was closed until a
+            # world existed: `wait` got ConnectionRefusedError, an OSError, and retried. Now the
+            # mod answers at the title screen and replies "no world is loaded", which surfaces as
+            # DevBridgeError and escaped this loop on the first pass - turning a readiness wait
+            # into an immediate failure, which is the one thing `wait` exists to prevent.
             last = exc if not isinstance(exc, SystemExit) else last
             time.sleep(2.0)
     print(f"server did not become ready within {args.for_seconds:g}s ({last})", file=sys.stderr)
@@ -631,7 +637,7 @@ def cmd_ping(args) -> int:
     if getattr(args, "json", False):
         emit(args, reply)
     else:
-        for key in ("protocol", "side", "mcVersion", "hasClient", "worldName", "mods",
+        for key in ("protocol", "side", "mcVersion", "hasClient", "world", "worldName", "mods",
                     "gameDir", "pauseOnLostFocus", "inputLocked"):
             if key in reply:
                 print(f"{key}: {reply[key]}")
@@ -745,15 +751,19 @@ def cmd_launch(args) -> int:
             with DevBridge(port=args.port, timeout=5.0) as bridge:
                 reply = bridge.ping()
             # A CLIENT NOW ANSWERS BEFORE ANY WORLD EXISTS (devbridge 0.6.0), so an answer alone no
-            # longer means what --wait was asked for. A caller that named a world wants that world
-            # loaded; returning at the title screen would hand every existing script - the quest
-            # verifier included - a bridge with no world behind it, and the failure would surface
-            # later as "cmd needs a world" from somewhere that never asked about worlds.
+            # longer means what --wait was asked for. Every verb worth waiting for - cmd, check,
+            # probe - needs a world, so readiness is `world`, not `up`.
             #
-            # `world` is absent on devbridge 0.5.0 and earlier, where answering did mean a world.
-            # Treating missing as True keeps those builds behaving exactly as before.
-            if args.world and not reply.get("world", True):
-                last = "at the title screen, no world yet"
+            # KEYED ON THE REPLY, NOT ON --world. Gating this on whether the caller passed --world
+            # looked equivalent and is not: without --world the game never loads one, so a
+            # `launch --wait` with no world would return 0 for a client sitting at the title
+            # screen. That is a worse signal than the timeout it replaced, and it would push the
+            # failure downstream into a verb that never mentioned worlds.
+            #
+            # `world` is absent on devbridge 0.5.0 and earlier, where answering did mean a world
+            # existed. Treating missing as True keeps those builds behaving exactly as before.
+            if not reply.get("world", True):
+                last = "answering at the title screen, but no world is loaded"
                 time.sleep(3.0)
                 continue
             emit(args, {**started_info, "up": True, **reply},
@@ -761,10 +771,22 @@ def cmd_launch(args) -> int:
             return 0
         except (OSError, DevBridgeError):
             time.sleep(3.0)
-    emit(args, {**started_info, "up": False, "timedOut": True})
+    # The reason belongs in the payload, not only on stderr. --json is the surface to script
+    # against, and "the game never started" and "the game is up but never loaded a world" are the
+    # exact two states this release added a difference between; a bare timedOut cannot tell them
+    # apart.
+    reached = last.startswith("answering")
+    emit(args, {**started_info, "up": reached, "world": False, "timedOut": True,
+                "reason": last})
     print(f"launch: not ready on {args.port} within {args.for_seconds:g}s ({last})",
           file=sys.stderr)
-    if args.world and last.startswith("at the title screen"):
+    if reached and not args.world:
+        # No --world was passed, so no world was ever going to load. That is a caller mistake
+        # rather than a slow start, and saying so beats another 300 seconds of waiting next time.
+        print("launch: no --world was given, so the game had nothing to load. Pass --world NAME, "
+              "or drive the menu: "
+              f"gamebridge --devbridge {args.port} screen", file=sys.stderr)
+    elif reached:
         # The distinction that matters: the game is up and reachable, it just never loaded the
         # world. A replaced title screen swallows --quickPlaySingleplayer, and FancyMenu is the
         # common cause. The bridge is open, so the menu can be driven from here.
@@ -848,11 +870,31 @@ def cmd_check(args) -> int:
     surfaced on failure rather than gated on - an unloaded chunk is the most likely reason a check
     that should pass does not.
     """
-    with connect(args) as rcon:
-        if hasattr(rcon, "run"):
-            reply = rcon.run(f"execute if {args.condition}", args.player if args.player else None)
-        else:
-            reply = {"output": rcon.command(f"execute if {args.condition}")}
+    try:
+        with connect(args) as rcon:
+            if hasattr(rcon, "run"):
+                reply = rcon.run(f"execute if {args.condition}",
+                                 args.player if args.player else None)
+            else:
+                reply = {"output": rcon.command(f"execute if {args.condition}")}
+    except DevBridgeError as exc:
+        # A worldless client answers now, so a check can reach one and be refused. That is not the
+        # world being in the wrong state, it is the condition never having been evaluated - the
+        # exact distinction this module is built around, and the docstring above calls confusing
+        # the two the worst thing a verifier can be confused about. Before 0.6.0 the socket was
+        # shut at the title screen and this arrived as a refused connection instead.
+        #
+        # Caught here rather than in main(), which maps every transport error to 1: for this verb
+        # 1 already means "the assertion failed", and that is the wrong thing to say about an
+        # assertion nobody made.
+        if NO_WORLD not in str(exc):
+            raise
+        emit(args, {"condition": args.condition, "passed": False, "broken": True,
+                    "count": None, "expected": args.count, "output": str(exc)},
+             f"BROKEN {args.condition}")
+        print("warning: no world is loaded, so nothing was asserted about one. Load a world "
+              "first.", file=sys.stderr)
+        return CHECK_BROKEN
     output = reply.get("output", "")
 
     if "success" in reply:
@@ -890,6 +932,12 @@ def cmd_check(args) -> int:
     if not held and output and not output.startswith("Test failed"):
         print(f"note: {output.splitlines()[0]}", file=sys.stderr)
     return 0 if passed else CHECK_FAILED
+
+
+# The mod's wording when a verb needs a world and there is not one. Matched as a substring rather
+# than by an error code, because the protocol carries no code; if the mod's phrasing changes this
+# degrades to the old behaviour rather than misreporting.
+NO_WORLD = "no world is loaded"
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -66,7 +66,7 @@ Newline-delimited JSON, one request per line, one reply per line.
 {"ok": true, "path": "C:/.../run/screenshots/museum.png", "dir": "C:/.../run/screenshots"}
 
 {"verb": "ping"}
-{"ok": true, "protocol": 4, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
+{"ok": true, "protocol": 3, "side": "integrated", "mcVersion": "26.1.2", "hasClient": true, "world": true, "worldName": "New World", "mods": 51, "gameDir": "...", "pauseOnLostFocus": false, "inputLocked": false}
 ```
 
 `{"ok": false, "error": "..."}` on failure. Unknown verbs fail rather than being ignored, because a
